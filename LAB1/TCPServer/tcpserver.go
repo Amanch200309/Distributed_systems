@@ -9,11 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Amanch200309/Distributed_systems/LAB1/base"
 )
 
 // struct for TCP server
 type TCPServer struct {
-	base BaseServer
+	base base.BaseServer
 }
 
 // s *TCPServer metood för structen samma klass metod i andra språk

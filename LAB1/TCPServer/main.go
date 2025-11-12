@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/Amanch200309/Distributed_systems/LAB1/base"
 )
 
 func main() {
@@ -13,7 +15,7 @@ func main() {
 	port := os.Args[1]
 
 	s := &TCPServer{
-		BaseServer{Maxconn: 10}, //  10 connections max
+		base.BaseServer{Maxconn: 10}, //  10 connections max
 	}
 
 	//Lyssna på (0.0.0.0) + port default
