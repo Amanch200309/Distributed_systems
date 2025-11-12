@@ -58,7 +58,8 @@ func (p *ProxyServer) forward(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	//defer conn.Close()
+	req.Write(conn) // forward the request to target server
 
 	return http.ReadResponse(bufio.NewReader(conn), req)
 }
@@ -87,17 +88,31 @@ func (p *ProxyServer) handler(conn net.Conn) {
 	p.mu.Unlock()
 
 	if found {
+
 		// någon function som sickar tbx till client func(conn,cached), return
 		sendCachedResponse(conn, cached)
 
 	} else {
-		resp, _ := p.forward(req)
+		resp, err := p.forward(req)
+		if err != nil {
+			resp := newResponse(http.StatusBadGateway, "502 Bad Gateway\n") // create 502 response
+			resp.Write(conn)                                                // send response to client
+			return
+		}
 		//  resp = p.sendtoclient(req)
 		// resp is valid
 		// cache resp
 
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			resp := newResponse(http.StatusInternalServerError, "500 Internal Server Error\n") // create 500 response
+			resp.Write(conn)                                                                   // send response to client
+			return
+		}
+		resp.Body.Close()
+
+		/// spara i cache
 		p.mu.Lock()
-		body, _ := io.ReadAll(resp.Body)
 		p.cache[key] = &CacheEntry{
 			body:        body,
 			contentType: resp.Header.Get("Content-Type"),
@@ -105,7 +120,8 @@ func (p *ProxyServer) handler(conn net.Conn) {
 		}
 
 		p.mu.Unlock()
-		resp.Write(conn) /// skicka tbx
+
+		sendCachedResponse(conn, p.cache[key])
 	}
 
 }

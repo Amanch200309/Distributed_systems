@@ -1,0 +1,228 @@
+package main
+
+import (
+	"bufio"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+type Server interface {
+	Listen(address string) error
+	handler(conn net.Conn, ch chan)
+}
+
+/* 
+type Conn interface {
+    Read(b []byte) (n int, err error)
+    Write(b []byte) (n int, err error)
+    Close() error
+    LocalAddr() Addr
+    RemoteAddr() Addr
+    SetDeadline(t time.Time) error
+    SetReadDeadline(t time.Time) error
+    SetWriteDeadline(t time.Time) error
+}
+
+
+
+
+
+*/
+type TCPServer struct{}
+
+func (s *TCPServer) Listen(addr string ) error {
+	
+	l, err := net.Listen("tcp", addr)
+
+	if err != nil {
+		return errors.New("failed to listen to %s",addr)
+	}
+	defer l.Close()
+	
+	channel := make(chan struct{},10)
+	
+	for{
+		conn, err := l.Accept()
+
+		if (err != nil) {
+			continue
+		}		    
+		
+		
+		channel <- struct{}{} // ta spot 
+		go s.handler(conn,channel)
+	}
+
+
+
+}
+func (s *TCPServer) handler(conn net.Conn, channel chan struct{}){
+	
+	defer func() { 
+		conn.Close()
+		<- channel // release spot  
+	}() 
+
+		
+	msg := bufio.NewReader(conn)
+	req, err := http.ReadRequest(msg)
+	if err != nil {
+		return
+		// TODO: bad request response
+	}
+	if req.Method == "GET"{
+
+		}else if req.Method == "POST"  {
+		
+	} else {
+		return http.StatusNotImplemented // TODO: implement response
+	}
+
+	
+
+	
+}
+
+/* 
+resp := http.Response{
+    Status:     "200 OK",
+    StatusCode: 200,
+    Proto:      "HTTP/1.1",
+    ProtoMajor: 1,
+    ProtoMinor: 1,
+    Header:     make(http.Header),
+    Body:       io.NopCloser(strings.NewReader("Hello, world!\n")),
+}
+
+resp.Header.Set("Content-Type", "text/plain")
+resp.Write(conn)
+
+req.URL.Path  // "/index.html"
+*/
+
+func (s *TCPServer) getHandler(conn net.Conn,req *http.Request) {
+	
+
+	// path := req.URL.Path
+	// if path == "/" {
+	// 	path = "/index.html"
+	// }
+	// filename := "." + path
+	
+	file_path := filepath.Ext(req.URL.Path)   // kiend.html -> .html
+
+	resp := http.Response{
+		Status: "200 OK",
+		StatusCode: 200,
+		Proto: "HTTP/1.1",
+		ProtoMajor: 1,
+    	ProtoMinor: 1,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader("Hello, world!\n")),
+	}
+
+	switch file_path {
+	case ".html":
+		// något
+		resp.Header.Set("Content-Type", "text/html")
+		
+	case ".txt":
+		// något
+		resp.Header.Set("Content-Type", "text/plain")
+	case ".gif":
+		// något
+		resp.Header.Set("Content-Type", "image/gif")
+	case ".jpeg":
+		// något
+		resp.Header.Set("Content-Type", "image/jpeg")
+	case ".jpg":
+		//kkk
+		resp.Header.Set("Content-Type", "image/jpg")
+	case ".css":
+		// ddddd 
+		resp.Header.Set("Content-Type", "text/css")
+	}defualt {
+		// TODO: // erroro 400 bad request  "well-formed 400 "Bad Request" code. "
+	}
+	
+	/////////////////////// keind we är klar skicka tbx 
+	resp.Write(conn)
+
+}
+
+func (s *TCPServer) postHandler(conn net.Conn, req http.Request){
+	// path := req.URL.Path
+	// if path == "/" {
+	// 	path = "/index.html"
+	// }
+	// filename := "." + path
+	filepath = req.URL
+	file_path_extentsion:= filepath.Ext(req.URL.Path)   // kiend.html -> .html
+
+	resp := http.Response{
+		Status: "200 OK",
+		StatusCode: 200,
+		Proto: "HTTP/1.1",
+		ProtoMajor: 1,
+    	ProtoMinor: 1,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader("Hello, world!\n")),
+	}
+
+	bodyBytes, err := io.ReadAll(req.Body)
+
+	switch file_path_extentsion {
+	case ".html":
+		// något
+		resp.Header.Set("Content-Type", "text/html")
+		os.WriteFile(filepath, bodyBytes, 0644)
+		
+	case ".txt":
+		// något
+		resp.Header.Set("Content-Type", "text/plain")
+		os.WriteFile(filepath, bodyBytes, 0644)
+	case ".gif":
+		// något
+		resp.Header.Set("Content-Type", "image/gif")
+		os.WriteFile(filepath, bodyBytes, 0644)
+	case ".jpeg":
+		// något
+		resp.Header.Set("Content-Type", "image/jpeg")
+		os.WriteFile(filepath, bodyBytes, 0644)
+	case ".jpg":
+		//kkk
+		resp.Header.Set("Content-Type", "image/jpg")
+		os.WriteFile(filepath, bodyBytes, 0644)
+	case ".css":
+		// ddddd 
+		resp.Header.Set("Content-Type", "text/css")
+		os.WriteFile(filepath, bodyBytes, 0644)
+	
+	}
+		// TODO: // erroro 400 bad request  "well-formed 400 "Bad Request" code. "
+
+	
+	/////////////////////// keind we är klar skicka tbx 
+	resp.Write(conn)
+
+}
+
+func main() {
+	port := os.Args[1]
+	l, err := net.Listen("tcp", ":" + port)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+
+	//go start_connection();
+
+	fmt.Print("test")
+
+}
