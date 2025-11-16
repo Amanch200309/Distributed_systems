@@ -126,6 +126,7 @@ func (s *TCPServer) postHandler(conn net.Conn, req *http.Request) {
 	}
 
 	// create all dir and parent dirs (if needed /folder/kiend.html) 0= base oct 7 = user{4+2+1 = read,write,ex}, 5 = group{4+0+1=read,,execute} , 5 = others{4+0+1=read,,execute}
+	// Execute för på mappar betyder "få gå in i katalogen".
 	os.MkdirAll(filepath.Dir(filename), 0755)
 
 	err = os.WriteFile(filename, bodyBytes, 0644) // 0 = base oct 5 = user{4+2+0 = read,write,}, 4 = group{4+0+0=read,,} , 4 = others{4+0+0=read,,} write body to file
@@ -146,6 +147,8 @@ func (s *TCPServer) postHandler(conn net.Conn, req *http.Request) {
 		Header:        make(http.Header),
 		ContentLength: int64(len(msg)),
 		Body:          io.NopCloser(strings.NewReader(msg)), // create id.readcloser for the string
+		// Gör om Reader till ReadCloser eftersom Response.Body kräver Close().
+
 	}
 	resp.Header.Set("Content-Type", contentType)
 	resp.Write(conn)
@@ -160,8 +163,8 @@ func newResponse(statusCode int, body string) http.Response {
 		ProtoMajor: 1,
 		ProtoMinor: 1,
 		Header:     make(http.Header),
-		Body:       io.NopCloser(strings.NewReader(body)), // Gör om body-strängen till en io.ReadCloser så att http.Response kan läsa den.
-		// strings.NewReader(body) skapar en io.Reader, och io.NopCloser "wrappar" den
-		// så att den även har en tom Close()-metod (krävs för Response.Body).
+		Body:       io.NopCloser(strings.NewReader(body)),
+		// Gör om Reader till ReadCloser eftersom Response.Body kräver Close().
+
 	}
 }

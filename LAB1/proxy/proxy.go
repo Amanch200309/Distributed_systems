@@ -135,9 +135,9 @@ func newResponse(statusCode int, body string) http.Response {
 		ProtoMajor: 1,
 		ProtoMinor: 1,
 		Header:     make(http.Header),
-		Body:       io.NopCloser(strings.NewReader(body)), // Gör om body-strängen till en io.ReadCloser så att http.Response kan läsa den.
-		// strings.NewReader(body) skapar en io.Reader, och io.NopCloser "wrappar" den
-		// så att den även har en tom Close()-metod (krävs för Response.Body).
+		Body:       io.NopCloser(strings.NewReader(body)),
+		// Gör om Reader till ReadCloser eftersom Response.Body kräver Close().
+
 	}
 }
 
