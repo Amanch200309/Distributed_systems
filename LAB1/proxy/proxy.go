@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Amanch200309/Distributed_systems/LAB1/base"
 )
@@ -32,11 +33,13 @@ CacheEntry stores a cached HTTP response.
 	body: Response body data
 	contentType: HTTP Content-Type header value
 	statusCode: HTTP status code
+	timestamp: When this entry was cached
 */
 type CacheEntry struct {
 	body        []byte
 	contentType string
 	statusCode  int
+	timestamp   time.Time
 }
 
 /*
@@ -123,11 +126,17 @@ func (p *ProxyServer) handler(conn net.Conn) {
 	cached, found := p.cache[key]
 	p.mu.Unlock()
 
-	if found {
+	// Cache expiration time: 30 seconds
+	cacheExpiration := 30 * time.Second
+
+	// Check if cache entry is valid and not expired
+	cacheValid := found && time.Since(cached.timestamp) < cacheExpiration
+
+	if cacheValid {
 		// Send cached response to client
 		sendCachedResponse(conn, cached)
 	} else {
-		// Forward request to target server
+		// Forward request to target server (not cached or expired)
 		resp, err := p.forward(req)
 		if err != nil {
 			resp := newResponse(http.StatusBadGateway, "502 Bad Gateway\n")
@@ -144,12 +153,13 @@ func (p *ProxyServer) handler(conn net.Conn) {
 		}
 		resp.Body.Close()
 
-		// Store response in cache
+		// Store/update response in cache with current timestamp
 		p.mu.Lock()
 		p.cache[key] = &CacheEntry{
 			body:        body,
 			contentType: resp.Header.Get("Content-Type"),
 			statusCode:  resp.StatusCode,
+			timestamp:   time.Now(),
 		}
 		p.mu.Unlock()
 
