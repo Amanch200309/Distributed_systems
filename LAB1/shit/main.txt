@@ -13,21 +13,24 @@ import (
 
 // struct for TCP server
 type TCPServer struct {
+	base BaseServer
+}
+
+type BaseServer struct {
 	Maxconn int
 }
 
-// s *TCPServer metood för structen samma klass metod i andra språk
-func (s *TCPServer) Listen(addr string) error {
+func (b *BaseServer) Listen(port string, handler func(net.Conn)) error {
 
 	// start tcp-socket on addr
-	l, err := net.Listen("tcp", addr)
+	l, err := net.Listen("tcp", port)
 	if err != nil {
-		return fmt.Errorf("failed to listen to %s", addr)
+		return fmt.Errorf("failed to listen to %s", port)
 	}
 	defer l.Close()
 
 	//// Create one buffered channel that can hold up to Maxconn empty signals (struct{} values) if full block until a spot is free
-	channel := make(chan struct{}, s.Maxconn)
+	channel := make(chan struct{}, b.Maxconn)
 
 	//always accept new connections
 	for {
@@ -37,19 +40,24 @@ func (s *TCPServer) Listen(addr string) error {
 			continue // do not stop server on accept error
 		}
 
-		channel <- struct{}{}       // take spot
-		go s.handler(conn, channel) // handle client connection in new goroutine
+		channel <- struct{}{} // take spot
+		go func(c net.Conn) {
+			defer func() { // <--- detta kommer köras efter  handler(c) har kört klart
+				c.Close()
+				<-channel
+			}()
+			handler(c)
+		}(conn)
 	}
 }
 
-// Handling for one connection
-func (s *TCPServer) handler(conn net.Conn, channel chan struct{}) {
+// s *TCPServer metood för structen samma klass metod i andra språk
+func (s *TCPServer) Listen(port string) error {
+	return s.base.Listen(port, s.handler)
+}
 
-	//calles when function exits
-	defer func() {
-		conn.Close()
-		<-channel // release spot
-	}()
+// Handling for one connection
+func (s *TCPServer) handler(conn net.Conn) {
 
 	msg := bufio.NewReader(conn)
 	req, err := http.ReadRequest(msg) // read http request from client
@@ -199,8 +207,9 @@ func main() {
 	port := os.Args[1]
 
 	s := &TCPServer{
-		Maxconn: 10, //  10 connections max
+		BaseServer{Maxconn: 10}, //  10 connections max
 	}
+	p := €
 
 	//Lyssna på (0.0.0.0) + port default
 	if err := s.Listen(":" + port); err != nil {
