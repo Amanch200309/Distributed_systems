@@ -14,11 +14,12 @@ func main() {
 	}
 	port := os.Args[1]
 
+	// Initialize TCP server with connection limit
 	s := &TCPServer{
-		base.BaseServer{Maxconn: 10}, //  10 connections max
+		base.BaseServer{Maxconn: 10},
 	}
 
-	//Lyssna på (0.0.0.0) + port default
+	// Start server on all interfaces (0.0.0.0) with specified port
 	if err := s.Listen(":" + port); err != nil {
 		fmt.Println("error:", err)
 	}

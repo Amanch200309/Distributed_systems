@@ -9,18 +9,17 @@ import (
 )
 
 func main() {
-
 	if len(os.Args) < 2 {
 		fmt.Println("One arg required: (port)")
 		return
 	}
 	port := os.Args[1]
 
+	// Initialize proxy with cache, connection limit, and mutex for thread safety
 	p := &ProxyServer{make(map[string]*CacheEntry), base.BaseServer{Maxconn: 10}, &sync.Mutex{}}
 
-	//Lyssna på (0.0.0.0) + port default
+	// Start proxy server on all interfaces (0.0.0.0) with specified port
 	if err := p.Listen(":" + port); err != nil {
 		fmt.Println("error:", err)
 	}
-
 }

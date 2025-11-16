@@ -13,19 +13,39 @@ import (
 	"github.com/Amanch200309/Distributed_systems/LAB1/base"
 )
 
+/*
+ProxyServer is a caching HTTP proxy that forwards GET requests and stores responses.
+
+	cache: Map of URL -> cached response data
+	base: Underlying TCP server handling connections
+	mu: Mutex protecting cache from concurrent access
+*/
 type ProxyServer struct {
-	cache map[string]*CacheEntry // spara data på proxyn
-	base  base.BaseServer        // en bas tcp server som den kommunicerar med
-	mu    *sync.Mutex            // för att skydda cache map vid samtidiga accesser
+	cache map[string]*CacheEntry
+	base  base.BaseServer
+	mu    *sync.Mutex
 }
 
-// vad som ska sparas i cachen
+/*
+CacheEntry stores a cached HTTP response.
+
+	body: Response body data
+	contentType: HTTP Content-Type header value
+	statusCode: HTTP status code
+*/
 type CacheEntry struct {
-	body        []byte // hämtade datan
-	contentType string // content type för filen html,txt,jpeg etc
-	statusCode  int    // http status kod
+	body        []byte
+	contentType string
+	statusCode  int
 }
 
+/*
+Listen starts the proxy server.
+
+	Args: 	port (e.g., ":8080")
+	Returns: error if fails to start
+	Initializes cache and mutex if needed, delegates to base server
+*/
 func (p *ProxyServer) Listen(port string) error {
 	if p.cache == nil {
 		p.cache = make(map[string]*CacheEntry)
@@ -36,6 +56,12 @@ func (p *ProxyServer) Listen(port string) error {
 	return p.base.Listen(port, p.handler)
 }
 
+/*
+sendCachedResponse sends a cached HTTP response to the client.
+
+	Args: 	conn (client connection),
+			cached (cached response data)
+*/
 func sendCachedResponse(conn net.Conn, cached *CacheEntry) {
 	resp := http.Response{
 		Status:        fmt.Sprintf("%d %s", cached.statusCode, http.StatusText(cached.statusCode)),
@@ -51,82 +77,93 @@ func sendCachedResponse(conn net.Conn, cached *CacheEntry) {
 	resp.Write(conn)
 }
 
+/*
+forward sends the HTTP request to the target server and returns the response.
+
+	Args: 	req (HTTP request to forward)
+	Returns: HTTP response from target server, error if connection fails
+*/
 func (p *ProxyServer) forward(req *http.Request) (*http.Response, error) {
-	// TCPServer
-	target := req.URL.Host               // target server address
-	conn, err := net.Dial("tcp", target) // connect to target server loclalhost:80
+	target := req.URL.Host
+	conn, err := net.Dial("tcp", target)
 	if err != nil {
 		return nil, err
 	}
-	//defer conn.Close()
-	req.Write(conn) // forward the request to target server
 
+	req.Write(conn) // Forward request to target server
 	return http.ReadResponse(bufio.NewReader(conn), req)
 }
 
+/*
+handler processes incoming proxy requests.
+
+	Args: 	conn (client connection)
+	Handles GET requests: checks cache first, forwards to target if not cached,
+	caches response, and sends to client
+*/
 func (p *ProxyServer) handler(conn net.Conn) {
-
 	msg := bufio.NewReader(conn)
-	req, err := http.ReadRequest(msg) // read http request from client
+	req, err := http.ReadRequest(msg)
 	if err != nil {
-		resp := newResponse(http.StatusBadRequest, "400 Bad Request\n") // create 400 response
-		resp.Write(conn)                                                // send response to client
+		resp := newResponse(http.StatusBadRequest, "400 Bad Request\n")
+		resp.Write(conn)
 		return
 	}
+
 	if req.Method != "GET" {
-		resp := newResponse(http.StatusNotImplemented, "501 Not Implemented\n") // create 501 response as mentioned in the lab pm
-		resp.Write(conn)                                                        // send response to client
+		resp := newResponse(http.StatusNotImplemented, "501 Not Implemented\n")
+		resp.Write(conn)
 		return
 	}
 
-	//kolla om filen finns i cachen
-
-	key := req.URL.String() // använd url som nyckel ex /index.html
+	// Check cache for requested URL
+	key := req.URL.String()
 
 	p.mu.Lock()
-	cached, found := p.cache[key] // om filen finns i cachen found = true och cahched innehåller datan annars found = false och cached = nil
+	cached, found := p.cache[key]
 	p.mu.Unlock()
 
 	if found {
-
-		// någon function som sickar tbx till client func(conn,cached), return
+		// Send cached response to client
 		sendCachedResponse(conn, cached)
-
 	} else {
+		// Forward request to target server
 		resp, err := p.forward(req)
 		if err != nil {
-			resp := newResponse(http.StatusBadGateway, "502 Bad Gateway\n") // create 502 response
-			resp.Write(conn)                                                // send response to client
+			resp := newResponse(http.StatusBadGateway, "502 Bad Gateway\n")
+			resp.Write(conn)
 			return
 		}
-		//  resp = p.sendtoclient(req)
-		// resp is valid
-		// cache resp
 
+		// Read and cache response body
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			resp := newResponse(http.StatusInternalServerError, "500 Internal Server Error\n") // create 500 response
-			resp.Write(conn)                                                                   // send response to client
+			resp := newResponse(http.StatusInternalServerError, "500 Internal Server Error\n")
+			resp.Write(conn)
 			return
 		}
 		resp.Body.Close()
 
-		/// spara i cache
+		// Store response in cache
 		p.mu.Lock()
 		p.cache[key] = &CacheEntry{
 			body:        body,
 			contentType: resp.Header.Get("Content-Type"),
 			statusCode:  resp.StatusCode,
 		}
-
 		p.mu.Unlock()
 
 		sendCachedResponse(conn, p.cache[key])
 	}
-
 }
 
-// create new http response with status code and body=innehåll
+/*
+newResponse creates a simple HTTP response.
+
+	Args: 	statusCode (HTTP status code),
+			body (response body text)
+	Returns: http.Response with specified status and body
+*/
 func newResponse(statusCode int, body string) http.Response {
 	return http.Response{
 		Status:     fmt.Sprintf("%d %s", statusCode, http.StatusText(statusCode)),
@@ -136,26 +173,5 @@ func newResponse(statusCode int, body string) http.Response {
 		ProtoMinor: 1,
 		Header:     make(http.Header),
 		Body:       io.NopCloser(strings.NewReader(body)),
-		// Gör om Reader till ReadCloser eftersom Response.Body kräver Close().
-
 	}
 }
-
-/*
-func main() {
-
-	if len(os.Args) < 2 {
-		fmt.Println("One arg required: (port)")
-		return
-	}
-	port := os.Args[1]
-
-	p := &ProxyServer{}
-
-	_, err := p.Listen(":" + port)
-	if err != nil {
-		fmt.Println("Error starting server:", err)
-	}
-
-}
-*/

@@ -13,43 +13,66 @@ import (
 	"github.com/Amanch200309/Distributed_systems/LAB1/base"
 )
 
-// struct for TCP server
+/*
+TCPServer is an HTTP server that handles requests using raw TCP sockets.
+
+	base: Underlying TCP server managing connections
+*/
 type TCPServer struct {
 	base base.BaseServer
 }
 
-// s *TCPServer metood för structen samma klass metod i andra språk
+/*
+Listen starts the HTTP server.
+
+	Args: 	port (e.g., ":8080")
+	Returns: error if fails to start
+	Delegates to base server with handler for HTTP processing
+*/
 func (s *TCPServer) Listen(port string) error {
 	return s.base.Listen(port, s.handler)
 }
 
-// Handling for one connection
-func (s *TCPServer) handler(conn net.Conn) {
+/*
+handler processes incoming HTTP requests.
 
+	Args: 	conn (client connection)
+	Routes GET and POST requests to appropriate handlers, rejects other methods
+*/
+func (s *TCPServer) handler(conn net.Conn) {
 	msg := bufio.NewReader(conn)
-	req, err := http.ReadRequest(msg) // read http request from client
+	req, err := http.ReadRequest(msg)
 	if err != nil {
-		resp := newResponse(http.StatusBadRequest, "400 Bad Request\n") // create 400 response
-		resp.Write(conn)                                                // send response to client
+		resp := newResponse(http.StatusBadRequest, "400 Bad Request\n")
+		resp.Write(conn)
 		return
 	}
 
-	if req.Method == "GET" {
+	switch req.Method {
+	case "GET":
 		s.getHandler(conn, req)
-	} else if req.Method == "POST" {
+	case "POST":
 		s.postHandler(conn, req)
-	} else {
-		resp := newResponse(http.StatusNotImplemented, "501 Not Implemented\n") // create 501 response as mentioned in the lab pm
-		resp.Write(conn)                                                        // send response to client
+	default:
+		resp := newResponse(http.StatusNotImplemented, "501 Not Implemented\n")
+		resp.Write(conn)
 		return
 	}
 }
 
-// Handler for GET requests inputs: connection and request
-func (s *TCPServer) getHandler(conn net.Conn, req *http.Request) {
-	ext := filepath.Ext(req.URL.Path) // /index.html -> .html
-	filename := "." + req.URL.Path    // ./index.html
+/*
+getHandler serves files for GET requests.
 
+	Args: 	conn (client connection),
+			req (HTTP request)
+	Supports: .html, .txt, .gif, .jpeg/.jpg, .css files
+	Returns 404 if file not found, 400 for unsupported file types
+*/
+func (s *TCPServer) getHandler(conn net.Conn, req *http.Request) {
+	ext := filepath.Ext(req.URL.Path)
+	filename := "." + req.URL.Path
+
+	// Map file extension to content type
 	var contentType string
 	switch ext {
 	case ".html":
@@ -63,11 +86,11 @@ func (s *TCPServer) getHandler(conn net.Conn, req *http.Request) {
 	case ".css":
 		contentType = "text/css"
 	default:
-		resp := newResponse(http.StatusBadRequest, "400 Bad Request (unsupported extension)\n") // create 400 response as mentioned in the lab pm
-		resp.Write(conn)                                                                        // send response to client
+		resp := newResponse(http.StatusBadRequest, "400 Bad Request (unsupported extension)\n")
+		resp.Write(conn)
 		return
 	}
-	// open filename if error respond with 404
+
 	f, err := os.Open(filename)
 	if err != nil {
 		resp := newResponse(http.StatusNotFound, "404 Not Found\n")
@@ -76,8 +99,8 @@ func (s *TCPServer) getHandler(conn net.Conn, req *http.Request) {
 	}
 	defer f.Close()
 
-	info, _ := f.Stat() // get file info to obtain size
-	size := info.Size() // get file size
+	info, _ := f.Stat()
+	size := info.Size()
 
 	resp := http.Response{
 		Status:        "200 OK",
@@ -89,17 +112,25 @@ func (s *TCPServer) getHandler(conn net.Conn, req *http.Request) {
 		Body:          f,
 		ContentLength: size,
 	}
-	resp.Header.Set("Content-Type", contentType) // set content-type header
-	resp.Write(conn)                             // send response to client
+	resp.Header.Set("Content-Type", contentType)
+	resp.Write(conn)
 }
 
-// Handler for POST requests inputs: connection and request
+/*
+postHandler saves uploaded files from POST requests.
+
+	Args: 	conn (client connection),
+			req (HTTP request)
+	Creates directories as needed, saves file to path specified in URL
+	Returns 201 on success, 400/500 on errors
+*/
 func (s *TCPServer) postHandler(conn net.Conn, req *http.Request) {
 	defer req.Body.Close()
 
-	ext := filepath.Ext(req.URL.Path) // /index.html -> .html
-	filename := "." + req.URL.Path    // ./index.html
+	ext := filepath.Ext(req.URL.Path)
+	filename := "." + req.URL.Path
 
+	// Map file extension to content type
 	var contentType string
 	switch ext {
 	case ".html":
@@ -113,20 +144,19 @@ func (s *TCPServer) postHandler(conn net.Conn, req *http.Request) {
 	case ".css":
 		contentType = "text/css"
 	default:
-		resp := newResponse(http.StatusBadRequest, "Bad Request\n") // create 400 response as mentioned in the lab pm
-		resp.Write(conn)                                            // send response to client
+		resp := newResponse(http.StatusBadRequest, "Bad Request\n")
+		resp.Write(conn)
 		return
 	}
 
-	bodyBytes, err := io.ReadAll(req.Body) // read entire body of the clients post request
+	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		resp := newResponse(http.StatusBadRequest, "Error reading body\n") // create 400 response as mentioned in the lab pm
-		resp.Write(conn)                                                   // send response to client
+		resp := newResponse(http.StatusBadRequest, "Error reading body\n")
+		resp.Write(conn)
 		return
 	}
 
 	// create all dir and parent dirs (if needed /folder/kiend.html) 0= base oct 7 = user{4+2+1 = read,write,ex}, 5 = group{4+0+1=read,,execute} , 5 = others{4+0+1=read,,execute}
-	// Execute för på mappar betyder "få gå in i katalogen".
 	os.MkdirAll(filepath.Dir(filename), 0755)
 
 	err = os.WriteFile(filename, bodyBytes, 0644) // 0 = base oct 5 = user{4+2+0 = read,write,}, 4 = group{4+0+0=read,,} , 4 = others{4+0+0=read,,} write body to file
@@ -136,7 +166,6 @@ func (s *TCPServer) postHandler(conn net.Conn, req *http.Request) {
 		return
 	}
 
-	// respond
 	msg := "File saved successfully\n"
 	resp := http.Response{
 		Status:        "201 Created",
@@ -146,15 +175,19 @@ func (s *TCPServer) postHandler(conn net.Conn, req *http.Request) {
 		ProtoMinor:    1,
 		Header:        make(http.Header),
 		ContentLength: int64(len(msg)),
-		Body:          io.NopCloser(strings.NewReader(msg)), // create id.readcloser for the string
-		// Gör om Reader till ReadCloser eftersom Response.Body kräver Close().
-
+		Body:          io.NopCloser(strings.NewReader(msg)),
 	}
 	resp.Header.Set("Content-Type", contentType)
 	resp.Write(conn)
 }
 
-// create new http response with status code and body=innehåll
+/*
+newResponse creates a simple HTTP response.
+
+	Args: 	statusCode (HTTP status code),
+			body (response body text)
+	Returns: http.Response with specified status and body
+*/
 func newResponse(statusCode int, body string) http.Response {
 	return http.Response{
 		Status:     fmt.Sprintf("%d %s", statusCode, http.StatusText(statusCode)),
@@ -164,7 +197,5 @@ func newResponse(statusCode int, body string) http.Response {
 		ProtoMinor: 1,
 		Header:     make(http.Header),
 		Body:       io.NopCloser(strings.NewReader(body)),
-		// Gör om Reader till ReadCloser eftersom Response.Body kräver Close().
-
 	}
 }

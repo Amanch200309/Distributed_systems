@@ -5,35 +5,44 @@ import (
 	"net"
 )
 
+/*
+BaseServer is a concurrent TCP server with connection limits.
+
+	Maxconn: Maximum simultaneous connections allowed
+*/
 type BaseServer struct {
 	Maxconn int
 }
 
-func (b *BaseServer) Listen(port string, handler func(net.Conn)) error {
+/*
+Listen starts the TCP server and handles incoming connections concurrently.
 
-	// start tcp-socket on addr
+	Args: 	port (e.g., ":8080"),
+			handler function for each connection
+	Returns: error if fails to start
+	Limits connections to Maxconn, runs handler in separate goroutines
+*/
+func (b *BaseServer) Listen(port string, handler func(net.Conn)) error {
 	l, err := net.Listen("tcp", port)
 	if err != nil {
 		return fmt.Errorf("failed to listen to %s", port)
 	}
 	defer l.Close()
 
-	//// Create one buffered channel that can hold up to Maxconn empty signals (struct{} values) if full block until a spot is free
-	channel := make(chan struct{}, b.Maxconn)
+	channel := make(chan struct{}, b.Maxconn) // Semaphore for connection limiting
 
-	//always accept new connections
 	for {
-		conn, err := l.Accept() // accept new client connection
+		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println("accept error:", err)
-			continue // do not stop server on accept error
+			continue
 		}
 
-		channel <- struct{}{} // take spot
+		channel <- struct{}{} // Acquire slot (blocks if at max)
 		go func(c net.Conn) {
-			defer func() { // <--- detta kommer köras efter  handler(c) har kört klart
+			defer func() {
 				c.Close()
-				<-channel
+				<-channel // Release slot
 			}()
 			handler(c)
 		}(conn)
