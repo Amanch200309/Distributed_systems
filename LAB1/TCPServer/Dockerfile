@@ -4,11 +4,14 @@ FROM golang:1.22-alpine AS builder
 # Create app directory
 WORKDIR /app
 
-# Copy source
-COPY . .
+# Copy go.mod and base package first
+COPY go.mod ./
+COPY base ./base
+COPY TCPServer ./TCPServer
 
 # Build the server binary
-RUN go build -o http_server main.go
+WORKDIR /app/TCPServer
+RUN go build -o http_server .
 
 # --- Run Stage ---
 FROM alpine:latest
@@ -16,7 +19,7 @@ FROM alpine:latest
 WORKDIR /app
 
 # Copy only the final binary
-COPY --from=builder /app/http_server .
+COPY --from=builder /app/TCPServer/http_server .
 
 # Expose default port (optional — you pass your own)
 EXPOSE 8080
