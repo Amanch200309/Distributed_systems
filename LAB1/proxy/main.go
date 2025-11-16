@@ -5,7 +5,7 @@ import (
 	"os"
 	"sync"
 
-	"distributed-systems/lab1/base"
+	"github.com/Amanch200309/Distributed_systems/LAB1/base"
 )
 
 func main() {
