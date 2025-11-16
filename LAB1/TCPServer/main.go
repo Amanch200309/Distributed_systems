@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Amanch200309/Distributed_systems/LAB1/base"
+	"distributed-systems/lab1/base"
 )
 
 func main() {
