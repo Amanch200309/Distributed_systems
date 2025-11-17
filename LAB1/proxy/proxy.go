@@ -22,9 +22,10 @@ ProxyServer is a caching HTTP proxy that forwards GET requests and stores respon
 	mu: Mutex protecting cache from concurrent access
 */
 type ProxyServer struct {
-	cache map[string]*CacheEntry
-	base  base.BaseServer
-	mu    *sync.Mutex
+	cache           map[string]*CacheEntry
+	base            base.BaseServer
+	mu              *sync.Mutex
+	cacheExpiration time.Duration
 }
 
 /*
@@ -124,13 +125,11 @@ func (p *ProxyServer) handler(conn net.Conn) {
 
 	p.mu.Lock()
 	cached, found := p.cache[key]
-	p.mu.Unlock()
-
-	// Cache expiration time: 30 seconds
-	cacheExpiration := 30 * time.Second
 
 	// Check if cache entry is valid and not expired
-	cacheValid := found && time.Since(cached.timestamp) < cacheExpiration
+	cacheValid := found && time.Since(cached.timestamp) < p.cacheExpiration
+
+	p.mu.Unlock()
 
 	if cacheValid {
 		// Send cached response to client
