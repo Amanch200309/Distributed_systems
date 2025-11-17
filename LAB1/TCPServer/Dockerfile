@@ -21,7 +21,6 @@ WORKDIR /app
 # Copy only the final binary
 COPY --from=builder /app/TCPServer/http_server .
 
-# Expose default port (optional — you pass your own)
 EXPOSE 8080
 
 # Run the server with a port argument

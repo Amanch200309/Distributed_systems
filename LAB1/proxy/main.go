@@ -16,7 +16,7 @@ func main() {
 	}
 	port := os.Args[1]
 
-	// Initialize proxy with cache, connection limit, and mutex for thread safety, how long entries should be cached
+	// Initialize proxy with cache, connection limit, mutex, and how long entries should be cached
 	p := &ProxyServer{make(map[string]*CacheEntry), base.BaseServer{Maxconn: 10}, &sync.Mutex{}, 30 * time.Second}
 
 	// Start proxy server on all interfaces (0.0.0.0) with specified port

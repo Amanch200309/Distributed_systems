@@ -41,6 +41,16 @@ echo -e "\e[32mTesting 501 unimplemented method...\n\e[0m"
 curl -v -X DELETE localhost:$SERVER_PORT/test.html
 echo -e "\n"
 
+
+
+# Test POST make directory and upload
+echo -e "\n"
+echo -e "\e[32mTesting POST make directory and upload...\n\e[0m"
+curl -v -X POST --data-binary "<html><body><h1>test</h1></body></html>" localhost:$SERVER_PORT/snus/test.html
+echo -e "\n"
+
+
 # Kill server
 kill $PID
 rm test.html
+rm -r snus

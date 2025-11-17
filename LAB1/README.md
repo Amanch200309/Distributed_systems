@@ -147,7 +147,7 @@ curl -X POST http://localhost:8080/index.html -d "<html><body><h1>new_test</h1><
 ```
 
 ```bash
-curl -X GET http://localhost:8080/index.html -x http://localhost:8081 // should print new_test
+curl -X GET http://localhost:8080/index.html -x http://localhost:8081 
 ```
 should return ```<html><body><h1>new_test</h1></body></html>%```
 
