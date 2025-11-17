@@ -15,7 +15,7 @@ Both Docker images are assumed to be stored as .tar files locally.
 Create two Amazon Linux 2 EC2 instances:
 
 ### Instance A – Server
-Used to serve files  
+Used to serve files  e
 Port: 8080
 
 ### Instance B – Proxy
