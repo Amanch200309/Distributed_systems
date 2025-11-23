@@ -23,7 +23,7 @@ Listen starts the TCP server and handles incoming connections concurrently.
 	Limits connections to Maxconn, runs handler in separate goroutines
 */
 func (b *BaseServer) Listen(port string, handler func(net.Conn)) error {
-	l, err := net.Listen("tcp", port)
+	l, err := net.Listen("tcp", port) // TCP-listener on given porten
 	if err != nil {
 		return fmt.Errorf("failed to listen to %s", port)
 	}
@@ -38,7 +38,7 @@ func (b *BaseServer) Listen(port string, handler func(net.Conn)) error {
 			continue
 		}
 
-		channel <- struct{}{} // Acquire slot (blocks if at max)
+		channel <- struct{}{} // Acquire slot (blocks if at max), may be better in go func(c net.Conn)
 		go func(c net.Conn) {
 			defer func() {
 				c.Close()

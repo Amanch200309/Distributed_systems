@@ -68,13 +68,15 @@ sendCachedResponse sends a cached HTTP response to the client.
 */
 func sendCachedResponse(conn net.Conn, cached *CacheEntry) {
 	resp := http.Response{
-		Status:        fmt.Sprintf("%d %s", cached.statusCode, http.StatusText(cached.statusCode)),
-		StatusCode:    cached.statusCode,
-		Proto:         "HTTP/1.1",
-		ProtoMajor:    1,
-		ProtoMinor:    1,
-		Header:        make(http.Header),
-		Body:          io.NopCloser(bytes.NewReader(cached.body)),
+		Status:     fmt.Sprintf("%d %s", cached.statusCode, http.StatusText(cached.statusCode)), // e.g., cached.statusCode = number and http.StatusText gives text for that number
+		StatusCode: cached.statusCode,
+		Proto:      "HTTP/1.1",
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(bytes.NewReader(cached.body)),
+		// io.NopCloser wraps the byte reader with a dummy Close() method,
+		// because http.Response.Body must be an io.ReadCloser.
 		ContentLength: int64(len(cached.body)),
 	}
 	resp.Header.Set("Content-Type", cached.contentType)
@@ -88,14 +90,15 @@ forward sends the HTTP request to the target server and returns the response.
 	Returns: HTTP response from target server, error if connection fails
 */
 func (p *ProxyServer) forward(req *http.Request) (*http.Response, error) {
-	target := req.URL.Host
-	conn, err := net.Dial("tcp", target)
+	target := req.URL.Host               // example: localhost:8080
+	conn, err := net.Dial("tcp", target) // Connect to target server
 	if err != nil {
 		return nil, err
 	}
 
-	req.Write(conn) // Forward request to target server
-	return http.ReadResponse(bufio.NewReader(conn), req)
+	req.Write(conn)                                      // Forward request to target server
+	return http.ReadResponse(bufio.NewReader(conn), req) // bufio needed to read http respnse line by line from the tcp connection
+	// htt.ReadRespnse parses the raw http response into a http.Response struct
 }
 
 /*
@@ -121,13 +124,14 @@ func (p *ProxyServer) handler(conn net.Conn) {
 	}
 
 	// Check cache for requested URL
-	key := req.URL.String()
+	key := req.URL.String() // key is url example: http://localhost:8080/index.html
 
 	p.mu.Lock()
 	cached, found := p.cache[key]
 
 	// Check if cache entry is valid and not expired
-	cacheValid := found && time.Since(cached.timestamp) < p.cacheExpiration
+	cacheValid := found && time.Since(cached.timestamp) < p.cacheExpiration // time.Since is the time since the cache was stored
+	// and p.cacheExpiration is how long we want to keep it cached
 
 	p.mu.Unlock()
 
@@ -138,13 +142,13 @@ func (p *ProxyServer) handler(conn net.Conn) {
 		// Forward request to target server (not cached or expired)
 		resp, err := p.forward(req)
 		if err != nil {
-			resp := newResponse(http.StatusBadGateway, "502 Bad Gateway\n")
+			resp := newResponse(http.StatusBadGateway, "502 Bad Gateway\n") // the server is not reachable
 			resp.Write(conn)
 			return
 		}
 
 		// Read and cache response body
-		body, err := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body) // io.ReadAll reads the entire response body and returns it as a []byte
 		if err != nil {
 			resp := newResponse(http.StatusInternalServerError, "500 Internal Server Error\n")
 			resp.Write(conn)
@@ -182,5 +186,7 @@ func newResponse(statusCode int, body string) http.Response {
 		ProtoMinor: 1,
 		Header:     make(http.Header),
 		Body:       io.NopCloser(strings.NewReader(body)),
+		// io.NopCloser simply wraps the string reader so that
+		// it has a Close() method, because http.Response.Body requires something that can be closed.
 	}
 }
