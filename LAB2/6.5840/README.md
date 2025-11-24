@@ -125,3 +125,34 @@ Testerna inkluderar:
 ---
 
 Vill du ha en ännu mer komplett README (med installation, strukturöversikt, förklaringar av RPC-API, exempelbilder), så fixar jag det också!
+
+
+## MANUAL tests
+cd ~/Desktop/Distributed_systems/LAB2/6.5840/src/main
+
+rm -f wc.so mr-out-* seq-out dist-out
+go build -buildmode=plugin ../mrapps/wc.go
+
+# sekventiellt
+go run mrsequential.go wc.so pg-*.txt
+
+# hela sorterade outputen (ingen head, ingen more)
+cat mr-out-0 | sort > seq-out
+2️⃣ Distribuerad output (dist-out)
+bash
+Kopiera kod
+rm -f mr-out-*
+
+# kör koordinator (i samma katalog)
+go run mrcoordinator.go pg-*.txt
+# (i en annan terminal:)
+go run mrworker.go wc.so
+När koordinatorn är klar:
+
+bash
+Kopiera kod
+cat mr-out-* | sort > dist-out
+3️⃣ Jämför – och få tystnad 😄
+bash
+Kopiera kod
+diff seq-out dist-out
