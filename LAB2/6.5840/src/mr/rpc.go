@@ -43,7 +43,14 @@ type DoneRequest struct {
 type DoneReply struct {
 }
 
-// Add your RPC definitions here.
+// Add your RPC definitions here. work -> cord
+type TaskCompleteArgs struct {
+	Tasktype string
+	Id       int
+}
+
+type TaskCompleteReply struct {
+}
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the coordinator.
