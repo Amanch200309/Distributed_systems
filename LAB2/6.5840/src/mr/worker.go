@@ -44,22 +44,23 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 		case TaskStateIdle, TaskStateInProgress:
 			if task.Tasktype == TaskMap {
 				mapfunction(task, mapf, nReduce)
-				reportfunction()
 
 			} else if task.Tasktype == TaskReduce {
-				reducefunction(task, reducef, NMaps)
-				reportfunction()
-			}
+				reduceFunction(task, reducef, NMaps)
 
-			// Execute the task
-			if task.Tasktype == TaskMap {
-				doMap(task, mapf, nReduce)
-			} else if task.Tasktype == TaskReduce {
-				doReduce(task, reducef, nMaps)
 			}
-			// Report completion
 			reportTaskComplete(task)
 
+			/*
+				// Execute the task
+				if task.Tasktype == TaskMap {
+					doMap(task, mapf, nReduce)
+				} else if task.Tasktype == TaskReduce {
+					doReduce(task, reducef, nMaps)
+				}
+				// Report completion
+				reportTaskComplete(task)
+			*/
 		}
 
 	}
@@ -73,7 +74,8 @@ func mapfunction(task Task, mapf func(string, string) []KeyValue, nReduce int) {
 	content, err := os.ReadFile(task.File)
 	if err != nil {
 		log.Printf("Error reading file: %v", err)
-		continue
+		return
+		//continue TODO:
 	}
 
 	// Step 2: Call the map function - it returns key-value pairs
@@ -120,7 +122,7 @@ func mapfunction(task Task, mapf func(string, string) []KeyValue, nReduce int) {
 	}
 }
 
-func doReduce(task Task, reducef func(string, []string) string, nMaps int) {
+func reduceFunction(task Task, reducef func(string, []string) string, nMaps int) {
 	// Read all intermediate files for this reduce task
 	kva := []KeyValue{}
 	for i := 0; i < nMaps; i++ {
@@ -142,11 +144,11 @@ func doReduce(task Task, reducef func(string, []string) string, nMaps int) {
 	}
 
 	// Sort by key
-	sort.Sort(ByKey(kva))
+	sort.Slice(kva, func(i, j int) bool { return kva[i].Key < kva[j].Key })
 
 	// Write output
 	oname := fmt.Sprintf("mr-out-%d", task.Id)
-	ofile, err := ioutil.TempFile("", "mr-tmp-*")
+	ofile, err := ioutil.TempFile(".", "mr-tmp-*")
 	if err != nil {
 		log.Fatalf("cannot create temp file")
 	}
@@ -190,7 +192,7 @@ func requestTask() (Task, int, int) {
 	args := TaskRequest{}
 	reply := TaskReply{}
 
-	ok := call("Coordinator.assignTask", &args, &reply)
+	ok := call("Coordinator.AssignTask", &args, &reply)
 	if !ok {
 		return Task{State: TaskStateCompleted}, 0, 0
 	}
@@ -232,7 +234,8 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 	sockname := coordinatorSock()
 	c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
-		log.Fatal("dialing:", err)
+		//log.Fatal("dialing:", err) TODO:
+		return false
 	}
 	defer c.Close()
 
@@ -241,6 +244,6 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 		return true
 	}
 
-	fmt.Println(err)
+	//fmt.Println(err)
 	return false
 }

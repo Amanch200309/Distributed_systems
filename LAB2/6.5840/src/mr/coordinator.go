@@ -80,7 +80,7 @@ func (c *Coordinator) TasksIsDone(m []Task) bool {
 	return true
 }
 
-func (c *Coordinator) assignTask(req *TaskRequest, reply *TaskReply) error {
+func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
