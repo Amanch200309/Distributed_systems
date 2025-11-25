@@ -12,39 +12,74 @@ import (
 
 type TaskState int
 
-// Task states
+/*
+Task states represent the lifecycle of a MapReduce task:
+
+	TaskStateIdle: Not yet assigned to any worker
+	TaskStateInProgress: Currently being executed by a worker
+	TaskStateCompleted: Successfully finished
+	TaskStateWait: No tasks available, worker should wait
+*/
 const (
-	TaskStateIdle TaskState = iota
+	TaskStateIdle TaskState = iota // enum
 	TaskStateInProgress
 	TaskStateCompleted
 	TaskStateWait
 )
 
+/*
+Task types distinguish between map and reduce phases
+*/
 const (
 	TaskMap    = "map"
 	TaskReduce = "reduce"
 )
 
+/*
+Task represents a single unit of work (map or reduce task).
+
+	Id: Unique identifier for this task
+	Tasktype: "map" or "reduce"
+	File: Input file path (for map tasks only)
+	State: Current execution state (idle, in-progress, completed, wait)
+	StartTime: When task was assigned (for timeout detection)
+*/
 type Task struct {
 	Id        int
-	Tasktype  string // map or reduce
+	Tasktype  string
 	File      string
-	State     TaskState // idle, in-progress, completed, wait
-	StartTime time.Time // time when the task was assigned
+	State     TaskState
+	StartTime time.Time
 }
 
+/*
+Coordinator manages the MapReduce job execution.
+
+	mu: Mutex protecting shared state from concurrent RPC handlers
+	nReduce: Number of reduce tasks, used for partitioning intermediate keys
+	Files: Input files for map tasks
+	mapTasks: Array of all map tasks
+	reduceTasks: Array of all reduce tasks
+	mapTaskWorkers: ADVANCED - Map of map task ID to worker address for pull-based reduce
+*/
 type Coordinator struct {
-	// Your definitions here.
-	mu          sync.Mutex // mutex for synchronizing access to shared data
-	nReduce     int        // number of reduce tasks
-	Files       []string
-	mapTasks    []Task
-	reduceTasks []Task
+	mu             sync.Mutex
+	nReduce        int
+	Files          []string
+	mapTasks       []Task
+	reduceTasks    []Task
+	mapTaskWorkers map[int]string // ADVANCED: track which worker handles each map task [id] and worker address
 }
 
-// Your code here -- RPC handlers for the worker to call.
+/*
+mapInnit initializes all map tasks for the coordinator.
 
-// initialize map tasks for the coordinator
+	Creates one map task per input file with:
+		- Sequential ID assignment
+		- Task type set to TaskMap
+		- File path for processing
+		- Initial state set to TaskStateIdle
+*/
 func (c *Coordinator) mapInnit() {
 
 	for i, f := range c.Files {
@@ -58,7 +93,14 @@ func (c *Coordinator) mapInnit() {
 	}
 }
 
-// initialize reduce tasks for the coordinator
+/*
+reduceInnit initializes all reduce tasks for the coordinator.
+
+	Creates nReduce tasks with:
+		Sequential ID assignment (0 to nReduce-1)
+		Task type set to TaskReduce
+		Initial state set to TaskStateIdle
+*/
 func (c *Coordinator) reduceInnit() {
 	for i := 0; i < c.nReduce; i++ {
 		task := Task{
@@ -70,8 +112,13 @@ func (c *Coordinator) reduceInnit() {
 	}
 }
 
+/*
+TasksIsDone checks if all tasks in a task list are completed.
+
+	Args: 	m (slice of tasks to check)
+	Returns: true if all tasks have state TaskStateCompleted, false otherwise
+*/
 func (c *Coordinator) TasksIsDone(m []Task) bool {
-	//return len(m) == 0 TODO: kanske ändra sen
 	for _, task := range m {
 		if task.State != TaskStateCompleted {
 			return false
@@ -80,12 +127,27 @@ func (c *Coordinator) TasksIsDone(m []Task) bool {
 	return true
 }
 
+/*
+AssignTask is an RPC handler that assigns tasks to workers.
+
+	Args: 	req (empty request from worker)
+			reply (with assigned task details)
+
+	Process:
+		1. Check for timed-out tasks (>10 seconds) and reset them to idle
+		2. If map tasks remain, assign an idle map task
+		3. Else if reduce tasks remain, assign an idle reduce task
+		4. If no idle tasks available, return TaskStateWait
+		5. If all work done, return TaskStateCompleted
+
+	Mutex ensures thread-safe access to task state
+*/
 func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	now := time.Now()
-	for i := range c.mapTasks { // TODO: give task to different worker? See if works
+	for i := range c.mapTasks {
 		if c.mapTasks[i].State == TaskStateInProgress && now.Sub(c.mapTasks[i].StartTime) > 10*time.Second {
 			c.mapTasks[i].State = TaskStateIdle
 		}
@@ -99,24 +161,27 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 	if !c.TasksIsDone(c.mapTasks) {
 
 		for i := range c.mapTasks {
-			// hämta task
 			task := &c.mapTasks[i]
 
 			if task.State == TaskStateIdle {
 				task.State = TaskStateInProgress
 				task.StartTime = time.Now()
-				reply.Task = *task            // assign task to reply
-				reply.NReduce = c.nReduce     // ADD - map needs to create NReduce intermediate files
-				reply.NMaps = len(c.mapTasks) // ADD - for completeness
+
+				// === ADVANCED
+				c.mapTaskWorkers[task.Id] = req.WorkerAddr // track worker for this map task
+				// === END ADVANCED
+
+				reply.Task = *task // assign task to reply
+				reply.NReduce = c.nReduce
+				reply.NMaps = len(c.mapTasks)
+				reply.MapWorkers = nil // ADVANCED: not needed for map tasks why? because only reduce tasks need to pull data from map workers
 				return nil
 			}
 		}
-		reply.Task = Task{State: TaskStateWait}
+		reply.Task = Task{State: TaskStateWait} //dummy task to signal wait
 		return nil
-
 	} else if !c.TasksIsDone(c.reduceTasks) {
 		for i := range c.reduceTasks {
-			// hämta task
 			task := &c.reduceTasks[i]
 
 			if task.State == TaskStateIdle {
@@ -125,6 +190,11 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 				reply.Task = *task // assign task to reply
 				reply.NReduce = c.nReduce
 				reply.NMaps = len(c.mapTasks)
+
+				// === ADVANCED:
+				reply.MapWorkers = c.mapTaskWorkers // pass the map of map task IDs to worker addresses
+				// === END ADVANCED
+
 				return nil
 			}
 		}
@@ -138,34 +208,41 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 	return nil
 }
 
-// RPC handler for workers to report task completion
+/*
+TaskComplete is an RPC handler for workers to report task completion.
+
+	Args: 	args (contains task type and ID)
+			reply (empty reply)
+
+	Updates the task state to TaskStateCompleted for the specified task.
+	Validates task ID is within valid range before updating.
+	Mutex ensures thread-safe state modification.
+*/
 func (c *Coordinator) TaskComplete(args *TaskCompleteArgs, reply *TaskCompleteReply) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if args.Tasktype == TaskMap {
+	switch args.Tasktype {
+	case TaskMap:
 		if args.Id >= 0 && args.Id < len(c.mapTasks) {
-
 			c.mapTasks[args.Id].State = TaskStateCompleted
 		}
-	} else if args.Tasktype == TaskReduce {
+	case TaskReduce:
 		if args.Id >= 0 && args.Id < len(c.reduceTasks) {
-
 			c.reduceTasks[args.Id].State = TaskStateCompleted
 		}
 	}
+
 	return nil
 }
 
-// an example RPC handler.
-//
-// the RPC argument and reply types are defined in rpc.go.
-func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
-	reply.Y = args.X + 1
-	return nil
-}
+/*
+server starts the RPC server thread for handling worker requests.
 
-// start a thread that listens for RPCs from worker.go
+	Registers coordinator RPC methods and listens on domain socket.
+	Socket name is generated from user ID for uniqueness.
+	Runs HTTP server in background goroutine.
+*/
 func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
@@ -179,27 +256,38 @@ func (c *Coordinator) server() {
 	go http.Serve(l, nil)
 }
 
-// main/mrcoordinator.go calls Done() periodically to find out
-// if the entire job has finished.
-func (c *Coordinator) Done() bool { // TODO: Implementation of task is done will be noticed here!
+/*
+Done checks if the entire MapReduce job is complete.
+
+	Returns: true if all map and reduce tasks are completed, false otherwise
+	Called periodically by main/mrcoordinator.go to determine when to exit
+	Thread-safe via mutex protection
+*/
+func (c *Coordinator) Done() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	return c.TasksIsDone(c.reduceTasks) && c.TasksIsDone(c.mapTasks)
 }
 
-// create a Coordinator.
-// main/mrcoordinator.go calls this function.
-// nReduce is the number of reduce tasks to use.
+/*
+MakeCoordinator creates and initializes a new coordinator.
+
+	Args: 	files (list of input files for map tasks)
+			nReduce (number of reduce tasks to create)
+	Returns: Initialized coordinator with RPC server running
+
+	Initializes map tasks (one per file) and reduce tasks (nReduce count).
+	Starts RPC server to handle worker requests.
+*/
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := &Coordinator{
-		nReduce: nReduce,
-		Files:   files,
+		nReduce:        nReduce,
+		Files:          files,
+		mapTaskWorkers: make(map[int]string), // ADVANCED: track map worker addresses
 	}
 	c.mapInnit()
 	c.reduceInnit()
-	// Your code here.
-
 	c.server()
 	return c
 }
