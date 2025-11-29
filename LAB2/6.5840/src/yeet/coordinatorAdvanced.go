@@ -1,4 +1,4 @@
-package mr
+package yeet
 
 import (
 	"log"
@@ -63,11 +63,12 @@ Coordinator manages the MapReduce job execution.
 	mapTaskWorkers: ADVANCED - Map of map task ID to worker address for pull-based reduce
 */
 type Coordinator struct {
-	mu          sync.Mutex
-	nReduce     int
-	Files       []string
-	mapTasks    []Task
-	reduceTasks []Task
+	mu             sync.Mutex
+	nReduce        int
+	Files          []string
+	mapTasks       []Task
+	reduceTasks    []Task
+	mapTaskWorkers map[int]string // ADVANCED: track which worker handles each map task [id] and worker address
 }
 
 /*
@@ -166,6 +167,10 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 				task.State = TaskStateInProgress
 				task.StartTime = time.Now()
 
+				// === ADVANCED
+				c.mapTaskWorkers[task.Id] = req.WorkerAddr // track worker for this map task
+				// === END ADVANCED
+
 				reply.Task = *task // assign task to reply
 				reply.NReduce = c.nReduce
 				reply.NMaps = len(c.mapTasks)
@@ -185,6 +190,10 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 				reply.Task = *task // assign task to reply
 				reply.NReduce = c.nReduce
 				reply.NMaps = len(c.mapTasks)
+
+				// === ADVANCED:
+				reply.MapWorkers = c.mapTaskWorkers // pass the map of map task IDs to worker addresses
+				// === END ADVANCED
 
 				return nil
 			}
@@ -240,9 +249,10 @@ server starts the RPC server thread for handling worker requests.
 func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
+	l, e := net.Listen("tcp", ":8080")
 	sockname := coordinatorSock()
 	os.Remove(sockname)
-	l, e := net.Listen("unix", sockname)
+	//l, e := net.Listen("unix", sockname)
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
@@ -278,8 +288,9 @@ MakeCoordinator creates and initializes a new coordinator.
 */
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := &Coordinator{
-		nReduce: nReduce,
-		Files:   files,
+		nReduce:        nReduce,
+		Files:          files,
+		mapTaskWorkers: make(map[int]string), // ADVANCED: track map worker addresses
 	}
 	c.mapInnit()
 	c.reduceInnit()

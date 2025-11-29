@@ -1,0 +1,70 @@
+
+func startWorkerRPCServer() string {
+	sock := fmt.Sprintf("worker-%d.sock", os.Getpid())
+
+	rpc.Register(new(WorkerRPC))
+	rpc.HandleHTTP()
+
+	// Remove previous socket if exists
+
+	os.Remove(sock)
+	//l, err := net.Listen("unix", sock)
+
+	l, err := net.Listen("tcp", "8081")
+
+	if err != nil {
+		log.Fatalf("Worker RPC listen error: %v", err)
+	}
+
+	go http.Serve(l, nil)
+	
+	//return sock
+	return l.Addr().String()
+}
+//////////////////////////////////////////////////
+
+
+func call(sockname string, rpcname string, args interface{}, reply interface{}) bool {
+	c, err := rpc.DialHTTP("tcp", ":8080")
+	//c, err := rpc.DialHTTP("unix", sockname)
+	if err != nil {
+		return false
+	}
+	defer c.Close()
+
+	err = c.Call(rpcname, args, reply)
+	if err == nil {
+		return true
+	}
+
+	return false
+}
+//////////////////////////////////////////////
+
+// BASIC Server using Unix domain sockets Uncomment
+/*
+func coordinatorSock() string {
+	s := "/var/tmp/5840-mr-"
+	s += strconv.Itoa(os.Getuid())
+	return s
+}
+*/
+
+// ADVANCED Server using TCP sockets
+func coordinatorSock() string {
+	return ":8080"
+}
+///////////////////////////////////
+func (c *Coordinator) server() {
+	rpc.Register(c)
+	rpc.HandleHTTP()
+	l, e := net.Listen("tcp", ":8080")
+	sockname := coordinatorSock()
+	os.Remove(sockname)
+	//l, e := net.Listen("unix", sockname)
+	if e != nil {
+		log.Fatal("listen error:", e)
+	}
+	go http.Serve(l, nil)
+}
+///////////////////////////////////

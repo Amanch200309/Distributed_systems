@@ -1,9 +1,4 @@
-package mr
-
-import (
-	"os"
-	"strconv"
-)
+package yeet
 
 /*
 TaskRequest is sent from worker to coordinator to request a new task.
@@ -11,6 +6,7 @@ TaskRequest is sent from worker to coordinator to request a new task.
 	Currently empty - no arguments needed for task requests
 */
 type TaskRequest struct {
+	WorkerAddr string
 }
 
 /*
@@ -95,9 +91,15 @@ coordinatorSock generates a unique Unix domain socket name for RPC communication
 */
 
 // BASIC Server using Unix domain sockets Uncomment
-
+/*
 func coordinatorSock() string {
 	s := "/var/tmp/5840-mr-"
 	s += strconv.Itoa(os.Getuid())
 	return s
+}
+*/
+
+// ADVANCED Server using TCP sockets
+func coordinatorSock() string {
+	return ":8080"
 }
