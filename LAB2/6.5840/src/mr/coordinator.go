@@ -1,6 +1,7 @@
 package mr
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -60,7 +61,6 @@ Coordinator manages the MapReduce job execution.
 	Files: Input files for map tasks
 	mapTasks: Array of all map tasks
 	reduceTasks: Array of all reduce tasks
-	mapTaskWorkers: ADVANCED - Map of map task ID to worker address for pull-based reduce
 */
 type Coordinator struct {
 	mu          sync.Mutex
@@ -169,7 +169,7 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 				reply.Task = *task // assign task to reply
 				reply.NReduce = c.nReduce
 				reply.NMaps = len(c.mapTasks)
-				reply.MapWorkers = nil // ADVANCED: not needed for map tasks why? because only reduce tasks need to pull data from map workers
+				//reply.MapWorkers = nil // ADVANCED: not needed for map tasks why? because only reduce tasks need to pull data from map workers
 				return nil
 			}
 		}
@@ -192,8 +192,10 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 		reply.Task = Task{State: TaskStateWait}
 		return nil
 	}
-	if c.Done() {
+	if c.TasksIsDone(c.mapTasks) && c.TasksIsDone(c.reduceTasks) {
 		reply.Task = Task{State: TaskStateCompleted}
+		fmt.Println("Coordinator: All tasks completed, signaling workers to exit")
+
 	}
 
 	return nil

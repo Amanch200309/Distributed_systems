@@ -1,0 +1,63 @@
+1. ssh -i mykey.pem ubuntu@COORD_PUBLIC_IP
+
+2. kör hostname -I gets the ip inside the vpc in aws so it gets the ip for it internally ip which will be used in rpcadvanced so the workers can recognize  //Dina workers och din coordinator kör INUTI samma VPC i AWS.
+
+
+## bygg filen wc.so
+
+cd mrapps
+go build -buildmode=plugin wc.go
+
+## bygg binaries
+
+cd ../main
+go build -o advcoordinator advcoordinator.go
+go build -o advworker advworker.go
+
+## flytta pg-* filer + ./advcoordinator + wc.so till coordinator instancen 
+
+cd ~/
+
+scp -i Downloads/labsuser.pem Desktop/Distributed_systems/LAB2/6.5840/src/main/advcoordinator Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so Desktop/Distributed_systems/LAB2/6.5840/src/main/pg-*.txt ubuntu@3.233.242.144:~/       
+
+## flyttta advworker + wc.so till alla worker instancer
+cd ~/
+scp -i Downloads/labsuser.pem Desktop/Distributed_systems/LAB2/6.5840/src/main/advworker Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so ubuntu@98.93.178.3:~/
+scp -i Downloads/labsuser.pem Desktop/Distributed_systems/LAB2/6.5840/src/main/advworker Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so ubuntu@3.239.98.54:~/
+
+
+## nu ligger alla filer på rätt instanser (säkerhetskolla)
+
+coordinator instans:
+ cd ~/  
+ ssh -i Downloads/labsuser.pem ubuntu@3.233.242.144
+    ls  # kolla att advcoordinator, wc.so och pg-* finns
+
+worker instans 1:
+    cd ~/
+    ssh -i Downloads/labsuser.pem ubuntu@98.93.178.3
+    ls  # kolla att advworker och wc.so finns
+    ssh -i Downloads/labsuser.pem ubuntu@3.239.98.54
+    ls  # kolla att advworker och wc.so finns
+
+## Starta coordinatorn i coordinator instansen
+    cd ~/  
+    ssh -i Downloads/labsuser.pem ubuntu@3.233.242.144
+    ./advcoordinator pg-*.txt
+
+## Starta workers i worker instanserna
+    cd ~/
+    ssh -i Downloads/labsuser.pem ubuntu@98.93.178.3
+    ./advworker wc.so
+
+    cd ~/
+    ssh -i Downloads/labsuser.pem ubuntu@3.239.98.54
+    ./advworker wc.so
+
+## ladda hem resultatet från coordinatorn när den är klar
+    cd ~/
+    scp -i Downloads/labsuser.pem ubuntu@3.239.98.54:~/mr-out-* .
+    scp -i Downloads/labsuser.pem ubuntu@98.93.178.3:~/mr-out-* .
+
+## slå ihop resultaten
+    cat mr-out-* | sort | head

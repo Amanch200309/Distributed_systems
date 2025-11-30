@@ -1,6 +1,7 @@
 package yeet
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -45,11 +46,12 @@ Task represents a single unit of work (map or reduce task).
 	StartTime: When task was assigned (for timeout detection)
 */
 type Task struct {
-	Id        int
-	Tasktype  string
-	File      string
-	State     TaskState
-	StartTime time.Time
+	Id          int
+	Tasktype    string
+	File        string
+	FileContent string
+	State       TaskState
+	StartTime   time.Time
 }
 
 /*
@@ -83,11 +85,19 @@ mapInnit initializes all map tasks for the coordinator.
 func (c *Coordinator) mapInnit() {
 
 	for i, f := range c.Files {
+
+		content, err := os.ReadFile(f)
+		if err != nil {
+			log.Printf("Coordinator: failed to read file %s: %v", f, err)
+			continue
+		}
+
 		task := Task{
-			Id:       i,
-			Tasktype: TaskMap,
-			File:     f,
-			State:    TaskStateIdle,
+			Id:          i,
+			Tasktype:    TaskMap,
+			File:        f,
+			FileContent: string(content),
+			State:       TaskStateIdle,
 		}
 		c.mapTasks = append(c.mapTasks, task)
 	}
@@ -201,8 +211,10 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 		reply.Task = Task{State: TaskStateWait}
 		return nil
 	}
-	if c.Done() {
+	if c.TasksIsDone(c.mapTasks) && c.TasksIsDone(c.reduceTasks) {
 		reply.Task = Task{State: TaskStateCompleted}
+		fmt.Println("Coordinator: All tasks completed, signaling workers to exit")
+
 	}
 
 	return nil
@@ -231,6 +243,8 @@ func (c *Coordinator) TaskComplete(args *TaskCompleteArgs, reply *TaskCompleteRe
 		if args.Id >= 0 && args.Id < len(c.reduceTasks) {
 			c.reduceTasks[args.Id].State = TaskStateCompleted
 		}
+	default:
+		return fmt.Errorf("invalid tasktype: %s", args.Tasktype)
 	}
 
 	return nil
@@ -250,8 +264,8 @@ func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
 	l, e := net.Listen("tcp", ":8080")
-	sockname := coordinatorSock()
-	os.Remove(sockname)
+	//sockname := coordinatorSock()
+	//os.Remove(sockname)
 	//l, e := net.Listen("unix", sockname)
 	if e != nil {
 		log.Fatal("listen error:", e)

@@ -12,6 +12,8 @@ import (
 	"os"
 	"sort"
 	"time"
+
+	mr "6.5840/mr"
 )
 
 /*
@@ -20,19 +22,13 @@ KeyValue represents a key-value pair from Map functions.
 	Key: The key string (e.g., a word in word count)
 	Value: The value string (e.g., "1" for each occurrence)
 */
-type KeyValue struct {
-	Key   string
-	Value string
-}
+type KeyValue = mr.KeyValue
 
-// === ADVANCED
 /*
 Handles RPC requests from other workers.
 Used for reduce workers to fetch intermediate data from map workers.
 */
 type WorkerRPC struct{}
-
-// === END ADVANCED
 
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
@@ -56,14 +52,11 @@ Worker is the main worker loop that requests and executes tasks from the coordin
 // main/mrworker.go calls this function.
 func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string) string) {
 
-	// === ADVANCED
 	workerAddr := startWorkerRPCServer()
-	// === END ADVANCED
 
 	for {
-		// === ADVANCED: Pass worker address to coordinator
+
 		task, nReduce, nMaps, mapWorkers := requestTask(workerAddr)
-		// === END ADVANCED
 
 		switch task.State {
 		case TaskStateCompleted:
@@ -77,17 +70,14 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 				mapfunction(task, mapf, nReduce)
 
 			} else if task.Tasktype == TaskReduce {
-				// === ADVANCED: Use pull-based reduce
+				// pull-based reduce
 				reduceFunctionAdvanced(task, reducef, nMaps, mapWorkers)
-				// === END ADVANCED
 
 			}
 			reportTaskComplete(task)
 		}
 	}
 }
-
-// === ADVANCED: Worker RPC Server
 
 /*
 GetBucket is an RPC handler that serves intermediate data to reduce workers.
@@ -121,6 +111,26 @@ func (w *WorkerRPC) GetBucket(args *GetBucketArgs, reply *GetBucketReply) error 
 }
 
 /*
+getIP retrieves the non-loopback local IP address of the worker.
+
+	Returns: Local IP address as string
+	Used for workers to register their address with the coordinator.
+
+	this works since aws uses private ip addresses within the same VPC - VPC = Virtual Private Cloud
+
+	works by
+*/
+
+func getIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80") // open a UDP connection to a public IP google DNS
+	if err != nil {
+		return "127.0.0.1"
+	}
+	defer conn.Close()
+	return conn.LocalAddr().(*net.UDPAddr).IP.String() // extract the local IP address from the connection
+}
+
+/*
 startWorkerRPCServer starts an RPC server for this worker to serve intermediate data.
 
 	Returns: Socket address for other workers to connect to
@@ -128,14 +138,14 @@ startWorkerRPCServer starts an RPC server for this worker to serve intermediate 
 	Runs the HTTP server in a background goroutine.
 */
 func startWorkerRPCServer() string {
-	sock := fmt.Sprintf("worker-%d.sock", os.Getpid())
+	//sock := fmt.Sprintf("worker-%d.sock", os.Getpid())
 
 	rpc.Register(new(WorkerRPC))
 	rpc.HandleHTTP()
 
 	// Remove previous socket if exists
 
-	os.Remove(sock)
+	//os.Remove(sock)
 	//l, err := net.Listen("unix", sock)
 
 	l, err := net.Listen("tcp", ":8081")
@@ -146,11 +156,9 @@ func startWorkerRPCServer() string {
 
 	go http.Serve(l, nil)
 
-	//return sock
-	return l.Addr().String()
+	ip := getIP() + ":8081"
+	return ip
 }
-
-// === END ADVANCED
 
 /*
 mapfunction executes a map task and partitions output into intermediate files.
@@ -171,12 +179,11 @@ mapfunction executes a map task and partitions output into intermediate files.
 		Each file contains KVs for a specific reduce worker
 */
 func mapfunction(task Task, mapf func(string, string) []KeyValue, nReduce int) {
+
+	time.Sleep(5 * time.Second) // Simulate some delay to be able to see multiple workers in action 5 seconds
+
 	// Step 1: Read the input file
-	content, err := os.ReadFile(task.File)
-	if err != nil {
-		log.Printf("Error reading file: %v", err)
-		return
-	}
+	content := task.FileContent
 
 	// Step 2: Call the map function - it returns key-value pairs
 	// Example: mapf returns [("apple","1"), ("banana","1"), ("apple","1")]
@@ -221,79 +228,6 @@ func mapfunction(task Task, mapf func(string, string) []KeyValue, nReduce int) {
 		os.Rename(tempFile.Name(), fname)
 	}
 }
-
-/*
-reduceFunction executes a reduce task by aggregating intermediate files.
-
-	Args: 	task (the reduce task to execute)
-			reducef (reduce function: key, []values -> output)
-			nMaps (number of map tasks that produced intermediate files)
-
-	Process:
-		1. Read all intermediate files mr-*-Y where Y = this reduce task ID
-		2. Collect all key-value pairs from these files
-		3. Sort by key to group same keys together
-		4. For each unique key, call reducef with all its values
-		5. Write output to mr-out-Y using atomic rename for crash safety
-
-	Example: For reduce task 2 with 8 map tasks
-		Reads: mr-0-2, mr-1-2, mr-2-2, ..., mr-7-2
-		Writes: mr-out-2
-
-	NOTE: This is the basic implementation using shared filesystem.
-*/
-func reduceFunction(task Task, reducef func(string, []string) string, nMaps int) {
-	// Read all intermediate files for this reduce task
-	kva := []KeyValue{}
-	for i := 0; i < nMaps; i++ {
-		filename := fmt.Sprintf("mr-%d-%d", i, task.Id)
-		file, err := os.Open(filename)
-		if err != nil {
-			continue // File might not exist if bucket was empty
-		}
-
-		dec := json.NewDecoder(file)
-		for {
-			var kv KeyValue
-			if err := dec.Decode(&kv); err != nil {
-				break
-			}
-			kva = append(kva, kv)
-		}
-		file.Close()
-	}
-
-	// Sort by key
-	sort.Slice(kva, func(i, j int) bool { return kva[i].Key < kva[j].Key })
-
-	// Write output
-	oname := fmt.Sprintf("mr-out-%d", task.Id)
-	ofile, err := ioutil.TempFile(".", "mr-tmp-*")
-	if err != nil {
-		log.Fatalf("cannot create temp file")
-	}
-	// Call reduce function for each unique key
-	i := 0
-	for i < len(kva) {
-		j := i + 1
-		for j < len(kva) && kva[j].Key == kva[i].Key {
-			j++
-		}
-		values := []string{}
-		for k := i; k < j; k++ {
-			values = append(values, kva[k].Value)
-		}
-		output := reducef(kva[i].Key, values)
-
-		// Write in the correct format
-		fmt.Fprintf(ofile, "%v %v\n", kva[i].Key, output)
-		i = j
-	}
-	ofile.Close()
-	os.Rename(ofile.Name(), oname)
-}
-
-// === ADVANCED
 
 /*
 reduceFunctionAdvanced executes a reduce task using pull-based RPC to fetch data from map workers.
@@ -364,8 +298,6 @@ func reduceFunctionAdvanced(task Task, reducef func(string, []string) string, nM
 	os.Rename(ofile.Name(), oname)
 }
 
-// === END ADVANCED
-
 /*
 reportTaskComplete notifies the coordinator that a task has finished.
 
@@ -379,7 +311,12 @@ func reportTaskComplete(task Task) {
 	}
 	reply := TaskCompleteReply{}
 
-	call(coordinatorSock(), "Coordinator.TaskComplete", &args, &reply)
+	ok := call(coordinatorSock(), "Coordinator.TaskComplete", &args, &reply)
+
+	if !ok {
+		fmt.Println("Worker: RPC to report task completion failed, exiting")
+		os.Exit(0)
+	}
 }
 
 /*
@@ -413,7 +350,7 @@ call sends an RPC request to the coordinator and waits for response.
 	Returns: true if RPC succeeds, false if connection/call fails
 */
 func call(sockname string, rpcname string, args interface{}, reply interface{}) bool {
-	c, err := rpc.DialHTTP("tcp", ":8080")
+	c, err := rpc.DialHTTP("tcp", sockname)
 	//c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		return false
@@ -421,14 +358,8 @@ func call(sockname string, rpcname string, args interface{}, reply interface{}) 
 	defer c.Close()
 
 	err = c.Call(rpcname, args, reply)
-	if err == nil {
-		return true
-	}
-
-	return false
+	return err == nil
 }
-
-// === ADVANCED: Worker-to-Worker RPC
 
 /*
 callWorker sends an RPC request to another worker and waits for response.
@@ -444,5 +375,3 @@ callWorker sends an RPC request to another worker and waits for response.
 func callWorker(sockname string, rpcname string, args interface{}, reply interface{}) bool {
 	return call(sockname, rpcname, args, reply)
 }
-
-// === END ADVANCED

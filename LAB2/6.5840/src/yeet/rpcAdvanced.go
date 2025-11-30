@@ -24,22 +24,6 @@ type TaskReply struct {
 }
 
 /*
-DoneRequest is sent from worker to check if job is complete.
-
-	Currently unused in implementation
-*/
-type DoneRequest struct {
-}
-
-/*
-DoneReply is the coordinator's response about job completion.
-
-	Currently unused in implementation
-*/
-type DoneReply struct {
-}
-
-/*
 TaskCompleteArgs is sent from worker to coordinator to report task completion.
 
 	Tasktype: "map" or "reduce"
@@ -98,8 +82,8 @@ func coordinatorSock() string {
 	return s
 }
 */
-
 // ADVANCED Server using TCP sockets
+
 func coordinatorSock() string {
-	return ":8080"
+	return "172.31.69.34" + ":8080"
 }

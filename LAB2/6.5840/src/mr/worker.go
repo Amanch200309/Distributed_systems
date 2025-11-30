@@ -50,7 +50,7 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 		task, nReduce, nMaps := requestTask()
 		switch task.State {
 		case TaskStateCompleted:
-			return
+			os.Exit(0)
 
 		case TaskStateWait:
 			time.Sleep(time.Second)
@@ -66,37 +66,6 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 			reportTaskComplete(task)
 		}
 	}
-}
-
-/*
-GetBucket is an RPC handler that serves intermediate data to reduce workers.
-
-	Args: 	args (contains map task ID and reduce bucket ID)
-			reply (populated with key-value pairs from the bucket)
-	Returns: error (nil on success)
-	Reads the intermediate file mr-{Map TaskID}-{ReduceID} and returns all key-value pairs.
-*/
-func GetBucket(args *GetBucketArgs, reply *GetBucketReply) error {
-	filename := fmt.Sprintf("mr-%d-%d", args.MapTaskID, args.ReduceID)
-
-	file, err := os.Open(filename)
-	if err != nil {
-		// Empty bucket - file might not exist if bucket was empty
-		reply.Data = []KeyValue{}
-		return nil
-	}
-	defer file.Close()
-
-	dec := json.NewDecoder(file)
-	for {
-		var kv KeyValue
-		if err := dec.Decode(&kv); err != nil {
-			break
-		}
-		reply.Data = append(reply.Data, kv)
-	}
-
-	return nil
 }
 
 /*
@@ -253,7 +222,11 @@ func reportTaskComplete(task Task) {
 	}
 	reply := TaskCompleteReply{}
 
-	call(coordinatorSock(), "Coordinator.TaskComplete", &args, &reply)
+	ok := call(coordinatorSock(), "Coordinator.TaskComplete", &args, &reply)
+	if !ok {
+		fmt.Println("Worker: RPC to report task completion failed, exiting")
+		os.Exit(0)
+	}
 }
 
 /*
@@ -272,6 +245,7 @@ func requestTask() (Task, int, int) {
 
 	ok := call(coordinatorSock(), "Coordinator.AssignTask", &args, &reply)
 	if !ok {
+		fmt.Println("Worker: Coordinator shutdown, exiting")
 		return Task{State: TaskStateCompleted}, 0, 0
 	}
 	return reply.Task, reply.NReduce, reply.NMaps
@@ -298,6 +272,5 @@ func call(sockname string, rpcname string, args interface{}, reply interface{}) 
 	if err == nil {
 		return true
 	}
-
 	return false
 }
