@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var count int = 10 // how many sec to sleep
+var sleepCount int = 10 // how many sec to sleep
 /*
 KeyValue represents a key-value pair from Map functions.
 
@@ -246,11 +246,11 @@ func requestTask() (Task, int, int) {
 
 	ok := call(coordinatorSock(), "Coordinator.AssignTask", &args, &reply)
 	if !ok {
-		if count == 0 {
+		if sleepCount == 0 {
 			fmt.Println("Worker: Coordinator shutdown, exiting")
 			return Task{State: TaskStateCompleted}, 0, 0
 		}
-		count -= 1
+		sleepCount -= 1
 		time.Sleep(time.Second)
 
 	}
