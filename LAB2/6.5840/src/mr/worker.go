@@ -133,7 +133,7 @@ func mapfunction(task Task, mapf func(string, string) []KeyValue, nReduce int) {
 		}
 		tempFile.Close()
 
-		// Atomic rename - if we crash before this, temp file is orphaned but target file is safe
+		// implement atomic rename, this will handle if we crash before temp file is saved as the target file. either the new file appears fully, or only the temp file remains.
 		os.Rename(tempFile.Name(), fname)
 	}
 }
@@ -261,7 +261,6 @@ call sends an RPC request to the coordinator and waits for response.
 	Returns: true if RPC succeeds, false if connection/call fails
 */
 func call(sockname string, rpcname string, args interface{}, reply interface{}) bool {
-	//c, err := rpc.DialHTTP("tcp", ":8080")
 	c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		return false
@@ -269,8 +268,5 @@ func call(sockname string, rpcname string, args interface{}, reply interface{}) 
 	defer c.Close()
 
 	err = c.Call(rpcname, args, reply)
-	if err == nil {
-		return true
-	}
-	return false
+	return err == nil
 }

@@ -24,7 +24,6 @@ type TaskReply struct {
 	Task    Task
 	NReduce int
 	NMaps   int
-	//MapWorkers map[int]string
 }
 
 /*
@@ -50,11 +49,8 @@ type TaskCompleteReply struct {
 coordinatorSock generates a unique Unix domain socket name for RPC communication.
 
 	Returns: Socket path in /var/tmp with user ID suffix
-	Uses /var/tmp instead of current directory for AFS compatibility
 	Format: /var/tmp/5840-mr-<uid>
 */
-
-// BASIC Server using Unix domain sockets Uncomment
 
 func coordinatorSock() string {
 	s := "/var/tmp/5840-mr-"

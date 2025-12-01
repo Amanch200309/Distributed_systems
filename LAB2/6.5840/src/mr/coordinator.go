@@ -169,7 +169,6 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 				reply.Task = *task // assign task to reply
 				reply.NReduce = c.nReduce
 				reply.NMaps = len(c.mapTasks)
-				//reply.MapWorkers = nil // ADVANCED: not needed for map tasks why? because only reduce tasks need to pull data from map workers
 				return nil
 			}
 		}
@@ -224,12 +223,12 @@ func (c *Coordinator) TaskComplete(args *TaskCompleteArgs, reply *TaskCompleteRe
 		if args.Id >= 0 && args.Id < len(c.reduceTasks) {
 			c.reduceTasks[args.Id].State = TaskStateCompleted
 		}
+	default:
+		return fmt.Errorf("invalid taasktype: %s", args.Tasktype)
 	}
 
 	return nil
 }
-
-// BASIC Server using Unix domain sockets Uncomment
 
 /*
 server starts the RPC server thread for handling worker requests.
@@ -242,17 +241,16 @@ server starts the RPC server thread for handling worker requests.
 func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
-	sockname := coordinatorSock()
-	os.Remove(sockname)
+
+	sockname := coordinatorSock() // get unique socket name
+	os.Remove(sockname)           // if already listening on the socket, remove it first
+
 	l, e := net.Listen("unix", sockname)
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
 	go http.Serve(l, nil)
 }
-
-// ADVANCED Server using TCP sockets
-//func (c *Coordinator) Server()
 
 /*
 Done checks if the entire MapReduce job is complete.

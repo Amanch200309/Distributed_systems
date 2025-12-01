@@ -3,7 +3,7 @@ package yeet
 /*
 TaskRequest is sent from worker to coordinator to request a new task.
 
-	Currently empty - no arguments needed for task requests
+	WorkerAddr: The network address of the requesting worker
 */
 type TaskRequest struct {
 	WorkerAddr string
@@ -15,6 +15,7 @@ TaskReply is the coordinator's response containing task assignment.
 	Task: The assigned task (or wait/completed signal)
 	NReduce: Number of reduce tasks (needed for map partitioning)
 	NMaps: Number of map tasks (needed for reduce file collection)
+	MapWorkers: Map of map task IDs to worker addresses (for reduce workers to pull intermediate data)
 */
 type TaskReply struct {
 	Task       Task
@@ -64,25 +65,12 @@ type GetBucketReply struct {
 	Data []KeyValue
 }
 
-// ==================== END ADVANCED ====================
-
 /*
-coordinatorSock generates a unique Unix domain socket name for RPC communication.
+coordinatoSock hardcoded address for the coordinator on AWS.
 
-	Returns: Socket path in /var/tmp with user ID suffix
-	Uses /var/tmp instead of current directory for AFS compatibility
-	Format: /var/tmp/5840-mr-<uid>
-*/
+	Returns: ip and port of the coordinator on AWS
 
-// BASIC Server using Unix domain sockets Uncomment
-/*
-func coordinatorSock() string {
-	s := "/var/tmp/5840-mr-"
-	s += strconv.Itoa(os.Getuid())
-	return s
-}
 */
-// ADVANCED Server using TCP sockets
 
 func coordinatorSock() string {
 	return "172.31.69.34" + ":8080"

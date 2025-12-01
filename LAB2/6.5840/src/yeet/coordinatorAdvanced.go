@@ -42,6 +42,7 @@ Task represents a single unit of work (map or reduce task).
 	Id: Unique identifier for this task
 	Tasktype: "map" or "reduce"
 	File: Input file path (for map tasks only)
+	FileContent: Content of the input file (for map tasks only)
 	State: Current execution state (idle, in-progress, completed, wait)
 	StartTime: When task was assigned (for timeout detection)
 */
@@ -202,7 +203,7 @@ func (c *Coordinator) AssignTask(req *TaskRequest, reply *TaskReply) error {
 				reply.NMaps = len(c.mapTasks)
 
 				// === ADVANCED:
-				reply.MapWorkers = c.mapTaskWorkers // pass the map of map task IDs to worker addresses
+				reply.MapWorkers = c.mapTaskWorkers // send to reduce worker to keep track of which map workers to pull from
 				// === END ADVANCED
 
 				return nil
@@ -250,31 +251,24 @@ func (c *Coordinator) TaskComplete(args *TaskCompleteArgs, reply *TaskCompleteRe
 	return nil
 }
 
-// BASIC Server using Unix domain sockets Uncomment
-
 /*
 server starts the RPC server thread for handling worker requests.
 
-	Registers coordinator RPC methods and listens on domain socket.
-	Socket name is generated from user ID for uniqueness.
+	Registers coordinator RPC methods and listens on tcp socket.
+	Socket is hardcoded to 8080.
 	Runs HTTP server in background goroutine.
 */
 
 func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
+
 	l, e := net.Listen("tcp", ":8080")
-	//sockname := coordinatorSock()
-	//os.Remove(sockname)
-	//l, e := net.Listen("unix", sockname)
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
 	go http.Serve(l, nil)
 }
-
-// ADVANCED Server using TCP sockets
-//func (c *Coordinator) Server()
 
 /*
 Done checks if the entire MapReduce job is complete.
@@ -297,7 +291,7 @@ MakeCoordinator creates and initializes a new coordinator.
 			nReduce (number of reduce tasks to create)
 	Returns: Initialized coordinator with RPC server running
 
-	Initializes map tasks (one per file) and reduce tasks (nReduce count).
+	Initializes map taks (one per file) and reduce tasks (nReduce count).
 	Starts RPC server to handle worker requests.
 */
 func MakeCoordinator(files []string, nReduce int) *Coordinator {

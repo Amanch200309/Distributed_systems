@@ -49,7 +49,7 @@ Worker is the main worker loop that requests and executes tasks from the coordin
 		- TaskStateWait: No tasks available, sleep and retry
 		- TaskStateInProgress: Execute map or reduce task, then report completion
 */
-// main/mrworker.go calls this function.
+// main/advworker.go calls this function.
 func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string) string) {
 
 	workerAddr := startWorkerRPCServer()
@@ -60,7 +60,7 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 
 		switch task.State {
 		case TaskStateCompleted:
-			return
+			os.Exit(0)
 
 		case TaskStateWait:
 			time.Sleep(time.Second)
@@ -180,7 +180,7 @@ mapfunction executes a map task and partitions output into intermediate files.
 */
 func mapfunction(task Task, mapf func(string, string) []KeyValue, nReduce int) {
 
-	time.Sleep(5 * time.Second) // Simulate some delay to be able to see multiple workers in action 5 seconds
+	//time.Sleep(5 * time.Second) // Simulate some delay to be able to see multiple workers in action 5 seconds
 
 	// Step 1: Read the input file
 	content := task.FileContent
@@ -224,7 +224,7 @@ func mapfunction(task Task, mapf func(string, string) []KeyValue, nReduce int) {
 		}
 		tempFile.Close()
 
-		// Atomic rename - if we crash before this, temp file is orphaned but target file is safe
+		// implement atomic rename, this will handle if we crash before temp file is saved as the target file. either the new file appears fully, or only the temp file remains.
 		os.Rename(tempFile.Name(), fname)
 	}
 }
@@ -257,7 +257,7 @@ func reduceFunctionAdvanced(task Task, reducef func(string, []string) string, nM
 		args := GetBucketArgs{MapTaskID: m, ReduceID: task.Id}
 		reply := GetBucketReply{}
 
-		ok := callWorker(workerAddr, "WorkerRPC.GetBucket", &args, &reply)
+		ok := call(workerAddr, "WorkerRPC.GetBucket", &args, &reply)
 		if ok {
 			kva = append(kva, reply.Data...)
 		} else {
@@ -351,7 +351,6 @@ call sends an RPC request to the coordinator and waits for response.
 */
 func call(sockname string, rpcname string, args interface{}, reply interface{}) bool {
 	c, err := rpc.DialHTTP("tcp", sockname)
-	//c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		return false
 	}
@@ -359,19 +358,4 @@ func call(sockname string, rpcname string, args interface{}, reply interface{}) 
 
 	err = c.Call(rpcname, args, reply)
 	return err == nil
-}
-
-/*
-callWorker sends an RPC request to another worker and waits for response.
-
-	Args: 	sockname (Unix domain socket path for worker connection)
-			rpcname (RPC method name, e.g., "WorkerRPC.GetBucket")
-			args (request arguments)
-			reply (
-			response struct to populate)
-	Returns: true if RPC succeeds, false if connection/call fails
-	Used by reduce workers to fetch intermediate data from map workers
-*/
-func callWorker(sockname string, rpcname string, args interface{}, reply interface{}) bool {
-	return call(sockname, rpcname, args, reply)
 }
