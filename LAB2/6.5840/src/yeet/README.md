@@ -1,3 +1,19 @@
+
+# build sequentiall 
+
+cd ~/Desktop/Distributed_systems/LAB2/6.5840/src/main
+build plugin ../mrapps/wc.go
+go run -race mrsequential.go ../mrapps/wc.so pg-*.txt
+# check output
+
+
+
+
+
+
+
+
+
 #  **1. Build Plugin (wc.so)**
 
 Rebuild plugin every time code in `mr/` changes:
@@ -35,32 +51,11 @@ Run as many workers as you want.
 ```bash
 ls mr-out-*
 cat mr-out-* | sort | head
+cat mr-out-* | sort > summed
 ```
 
-Expected:
 
-```
-A 509
-ABOUT 2
-ACT 8
-```
 
----
-
-# **3. Run Full Test Suite**
-
-```bash
-cd ~/Desktop/Distributed_systems/LAB2/6.5840/src/main
-bash test-mr.sh
-```
-
-Expected:
-
-```
-*** PASSED ALL TESTS
-```
-
----
 
 #  **4. Manual Correctness Verification**
 
@@ -83,23 +78,12 @@ cat mr-out-0 | sort > seq-out
 
 ---
 
-## Distributed output (basic version)
-
-```bash
-rm -f mr-out-*
-go run mrcoordinator.go pg-*.txt
-# In another terminal:
-go run mrworker.go wc.so
-
-cat mr-out-* | sort > dist-out
-```
-
 ---
 
 ## Compare
 
 ```bash
-diff seq-out dist-out
+diff seq-out summed
 ```
 
 No output = correct.
