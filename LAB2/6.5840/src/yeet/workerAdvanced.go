@@ -16,6 +16,7 @@ import (
 	mr "6.5840/mr"
 )
 
+var sleepCount int = 10 // how many sec to sleep
 /*
 KeyValue represents a key-value pair from Map functions.
 
@@ -335,7 +336,13 @@ func requestTask(workerAddr string) (Task, int, int, map[int]string) {
 
 	ok := call(coordinatorSock(), "Coordinator.AssignTask", &args, &reply)
 	if !ok {
-		return Task{State: TaskStateCompleted}, 0, 0, nil
+		if sleepCount == 0 {
+			fmt.Println("Worker: Coordinator shutdown, exiting")
+			return Task{State: TaskStateCompleted}, 0, 0, nil
+		}
+
+		sleepCount -= 1
+		time.Sleep(time.Second)
 	}
 	return reply.Task, reply.NReduce, reply.NMaps, reply.MapWorkers
 }
