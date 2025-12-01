@@ -50,7 +50,7 @@ cat mr-out-* | sort > summed
 
 
 
-#  **4. Manual Correctness Verification**
+#  **4. Manual Correctness Verification using sequential**
 
 ## Build plugin
 
@@ -98,6 +98,7 @@ Below is a full sequence of commands to deploy:
 
 ```bash
 cd ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps
+rm  *.so
 go build -race -buildmode=plugin wc.go
 
 cd ../main
@@ -116,7 +117,12 @@ go build -race -o advworker advworker.go
 cd ~/
 ssh -i Downloads/Downloads/labsuser.pem ubuntu@COORD_PUBLIC_IP //3.236.170.122
 
-hostname -I //inside aws to get private IP
+hostname -I //inside aws to get private IP which will be used in rpcAdvanced.go in 
+
+    func coordinatorSock() string {
+        return "hostname -I" + ":8080"
+    }
+
 
 
 Move binaries and plugin to aws instances
@@ -211,8 +217,8 @@ Workers will:
 # **Fetch output from workers**
 
 ```bash
-scp -i ~/Downloads/labsuser.pem "ubuntu@worker:~/mr-out-*" .
-scp -i ~/Downloads/labsuser.pem "ubuntu@worker:~/mr-out-*" .
+scp -i ~/Downloads/labsuser.pem "ubuntu@worker1:~/mr-out-*" .
+scp -i ~/Downloads/labsuser.pem "ubuntu@worker1:~/mr-out-*" .
 
 
 cat mr-out-* | sort | head
