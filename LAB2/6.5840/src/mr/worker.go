@@ -251,6 +251,7 @@ func requestTask() (Task, int, int) {
 			return Task{State: TaskStateCompleted}, 0, 0
 		}
 		sleepCount -= 1
+		fmt.Println("Worker: RPC to request task failed, retrying...", sleepCount)
 		time.Sleep(time.Second)
 
 	}

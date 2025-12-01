@@ -119,7 +119,6 @@ getIP retrieves the non-loopback local IP address of the worker.
 
 	this works since aws uses private ip addresses within the same VPC - VPC = Virtual Private Cloud
 
-	works by
 */
 
 func getIP() string {
@@ -139,15 +138,9 @@ startWorkerRPCServer starts an RPC server for this worker to serve intermediate 
 	Runs the HTTP server in a background goroutine.
 */
 func startWorkerRPCServer() string {
-	//sock := fmt.Sprintf("worker-%d.sock", os.Getpid())
 
 	rpc.Register(new(WorkerRPC))
 	rpc.HandleHTTP()
-
-	// Remove previous socket if exists
-
-	//os.Remove(sock)
-	//l, err := net.Listen("unix", sock)
 
 	l, err := net.Listen("tcp", ":8081")
 
@@ -342,6 +335,7 @@ func requestTask(workerAddr string) (Task, int, int, map[int]string) {
 		}
 
 		sleepCount -= 1
+		fmt.Println("Worker: RPC to request task failed, retrying...", sleepCount)
 		time.Sleep(time.Second)
 	}
 	return reply.Task, reply.NReduce, reply.NMaps, reply.MapWorkers

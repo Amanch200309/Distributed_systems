@@ -9,11 +9,6 @@ go run -race mrsequential.go ../mrapps/wc.so pg-*.txt
 
 
 
-
-
-
-
-
 #  **1. Build Plugin (wc.so)**
 
 Rebuild plugin every time code in `mr/` changes:
@@ -50,10 +45,8 @@ Run as many workers as you want.
 
 ```bash
 ls mr-out-*
-cat mr-out-* | sort | head
 cat mr-out-* | sort > summed
 ```
-
 
 
 
@@ -62,9 +55,10 @@ cat mr-out-* | sort > summed
 ## Build plugin
 
 ```bash
-cd ~/Desktop/Distributed_systems/LAB2/6.5840/src/main
-rm -f wc.so mr-out-* seq-out dist-out
-go build -buildmode=plugin ../mrapps/wc.go
+cd ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps
+rm  *.so
+go build -race -buildmode=plugin wc.go
+```
 ```
 
 ---
@@ -72,7 +66,8 @@ go build -buildmode=plugin ../mrapps/wc.go
 ## Sequential reference output
 
 ```bash
-go run mrsequential.go wc.so pg-*.txt
+cd ~/Desktop/Distributed_systems/LAB2/6.5840/src/main
+go run -race mrsequential.go ../mrapps/wc.so pg-*.txt
 cat mr-out-0 | sort > seq-out
 ```
 
@@ -103,11 +98,11 @@ Below is a full sequence of commands to deploy:
 
 ```bash
 cd ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps
-go build -buildmode=plugin wc.go
+go build -race -buildmode=plugin wc.go
 
 cd ../main
-go build -o advcoordinator advcoordinator.go
-go build -o advworker advworker.go
+go build -race -o advcoordinator advcoordinator.go
+go build -race -o advworker advworker.go
 ```
 
 ---
@@ -117,25 +112,36 @@ go build -o advworker advworker.go
 ## Upload to coordinator
 
 ```bash
-scp -i mykey.pem \
+
+cd ~/
+ssh -i Downloads/Downloads/labsuser.pem ubuntu@COORD_PUBLIC_IP //3.236.170.122
+
+hostname -I //inside aws to get private IP
+
+
+Move binaries and plugin to aws instances
+cd ~/
+scp -i Downloads/labsuser.pem \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/main/advcoordinator \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/main/pg-*.txt \
-ubuntu@COORD_PUBLIC_IP:~/
+ubuntu@COORD_PUBLIC_IP:~/  ## 3.236.170.122
 ```
 
 ## Upload to workers
 
 ```bash
-scp -i mykey.pem \
+scp -i Downloads/labsuser.pem \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/main/advworker \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so \
-ubuntu@WORKER1_PUBLIC_IP:~/
+ubuntu@WORKER1_PUBLIC_IP:~/ ## 100.24.209.41
 
-scp -i mykey.pem \
+
+scp -i Downloads/labsuser.pem \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/main/advworker \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so \
-ubuntu@WORKER2_PUBLIC_IP:~/
+ubuntu@WORKER2_PUBLIC_IP:~/ ## 44.200.74.246
+
 ```
 
 ---
@@ -145,7 +151,8 @@ ubuntu@WORKER2_PUBLIC_IP:~/
 ### Coordinator instance
 
 ```bash
-ssh -i mykey.pem ubuntu@COORD_PUBLIC_IP
+cd ~/
+ssh -i Downloads/labsuser.pem ubuntu@COORD_PUBLIC_IP
 ls
 ```
 
@@ -154,10 +161,10 @@ Should contain: `advcoordinator`, `wc.so`, `pg-xxx.txt`.
 ### Worker instances
 
 ```bash
-ssh -i mykey.pem ubuntu@WORKER1_PUBLIC_IP
+ssh -i Downloads/labsuser.pem ubuntu@WORKER1_PUBLIC_IP
 ls
 
-ssh -i mykey.pem ubuntu@WORKER2_PUBLIC_IP
+ssh -i Downloads/labsuser.pem ubuntu@WORKER2_PUBLIC_IP
 ls
 ```
 
@@ -170,7 +177,7 @@ Should contain: `advworker`, `wc.so`.
 ## Start coordinator
 
 ```bash
-ssh -i mykey.pem ubuntu@COORD_PUBLIC_IP
+ssh -i Downloads/labsuser.pem ubuntu@COORD_PUBLIC_IP
 ./advcoordinator pg-*.txt
 ```
 
@@ -181,14 +188,14 @@ Leave it running.
 Worker 1:
 
 ```bash
-ssh -i mykey.pem ubuntu@WORKER1_PUBLIC_IP
+ssh -i Downloads/labsuser.pem ubuntu@WORKER1_PUBLIC_IP
 ./advworker wc.so
 ```
 
 Worker 2:
 
 ```bash
-ssh -i mykey.pem ubuntu@WORKER2_PUBLIC_IP
+ssh -i Downloads/labsuser.pem ubuntu@WORKER2_PUBLIC_IP
 ./advworker wc.so
 ```
 
@@ -204,8 +211,12 @@ Workers will:
 # **Fetch output from workers**
 
 ```bash
-scp -i mykey.pem ubuntu@COORD_PUBLIC_IP:~/mr-out-* .
+scp -i ~/Downloads/labsuser.pem "ubuntu@worker:~/mr-out-*" .
+scp -i ~/Downloads/labsuser.pem "ubuntu@worker:~/mr-out-*" .
+
+
 cat mr-out-* | sort | head
+cat mr-out-0 | sort > aws-out
 ```
 
 Expected: same as sequential output.
