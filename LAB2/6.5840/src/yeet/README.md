@@ -216,7 +216,7 @@ scp -i ~/Downloads/labsuser.pem "ubuntu@worker:~/mr-out-*" .
 
 
 cat mr-out-* | sort | head
-cat mr-out-0 | sort > aws-out
+cat mr-out-* | sort > aws-out
 ```
 
 Expected: same as sequential output.
