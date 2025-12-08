@@ -115,12 +115,12 @@ go build -race -o advworker advworker.go
 ```bash
 
 cd ~/
-ssh -i Downloads/Downloads/labsuser.pem ubuntu@COORD_PUBLIC_IP //3.236.170.122
+ssh -i Downloads/Downloads/labsuser.pem ubuntu@COORD_PUBLIC_IP //34.239.171.135
 
 hostname -I //inside aws to get private IP which will be used in rpcAdvanced.go in 
 
     func coordinatorSock() string {
-        return "hostname -I" + ":8080"
+        return "hostname -I" + ":8080" // 172.31.69.34 
     }
 
 
@@ -131,7 +131,7 @@ scp -i Downloads/labsuser.pem \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/main/advcoordinator \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/main/pg-*.txt \
-ubuntu@COORD_PUBLIC_IP:~/  ## 3.236.170.122
+ubuntu@COORD_PUBLIC_IP:~/  ## 34.239.171.135
 ```
 
 ## Upload to workers
@@ -140,13 +140,15 @@ ubuntu@COORD_PUBLIC_IP:~/  ## 3.236.170.122
 scp -i Downloads/labsuser.pem \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/main/advworker \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so \
-ubuntu@WORKER1_PUBLIC_IP:~/ ## 100.24.209.41
+ubuntu@WORKER1_PUBLIC_IP:~/ ## 3.238.74.11
+
 
 
 scp -i Downloads/labsuser.pem \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/main/advworker \
 ~/Desktop/Distributed_systems/LAB2/6.5840/src/mrapps/wc.so \
-ubuntu@WORKER2_PUBLIC_IP:~/ ## 44.200.74.246
+ubuntu@WORKER2_PUBLIC_IP:~/ ## 34.237.76.194
+
 
 ```
 
