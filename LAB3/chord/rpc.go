@@ -7,6 +7,13 @@ import (
 	"net/rpc"
 )
 
+func (n *Node) FindRPC(args *FindRequest, reply *FindReply) error {
+    // Use the node's full local Find() implementation
+    succ := n.Find(args.ID)
+    reply.Node = succ
+    return nil
+}
+
 // rpcs method
 func (n *Node) FindSuccessorRPC(args *findSuccessorRequest, reply *findSuccessorReply) error {
 
@@ -19,6 +26,8 @@ func (n *Node) FindSuccessorRPC(args *findSuccessorRequest, reply *findSuccessor
 }
 
 func (n *Node) GetPredecessorRPC(arg getPredecessorRequest, reply getPredecessorReply) error {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
 	reply.Node = n.Predecessor
 	return nil
 }
@@ -32,6 +41,8 @@ func (rn *Node) PingRPC(arg pingRequest, reply pingReply) error {
 	reply.Alive = true
 	return nil
 }
+
+
 
 // RPC request and reply types
 
@@ -62,6 +73,14 @@ type pingRequest struct {
 }
 type pingReply struct {
 	Alive bool
+}
+
+type FindRequest struct {
+    ID *big.Int
+}
+
+type FindReply struct {
+    Node *RemoteNode
 }
 
 func call(address string, rpcname string, args interface{}, reply interface{}) bool {

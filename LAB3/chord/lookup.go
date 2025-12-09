@@ -49,6 +49,17 @@ func (n *Node) between(start, id, end *big.Int) bool {
 }
 
 // iterativt kolla alla noder i chord efter id och returna succ
+// Find(id)
+// --------------------
+// Full iterative Chord lookup that always STARTS FROM THIS NODE.
+// Used when WE are already part of the ring and want to resolve a key.
+// This calls FindSuccessorRPC repeatedly starting from our own address.
+//
+// Why needed:
+// - Local lookups (Lookup, StoreFile, PrintState) must begin at our node.
+// - Correct because our node is already in the ring.
+// - Cannot be used for Join(), because Join must start from the bootstrap node.
+//
 func (n *Node) Find(id *big.Int) *RemoteNode {
 	current := &RemoteNode{ID: n.id, Addr: n.Address}
 
@@ -73,6 +84,45 @@ func (n *Node) Find(id *big.Int) *RemoteNode {
 
 	return nil // failed after m steps
 }
+
+// FindFrom(start, id)
+// --------------------
+// Same iterative Chord lookup, BUT starts from ANY node we choose.
+// Used during Join(), because we are NOT in the ring yet.
+// We must begin lookup from the bootstrap node (the one given by --ja/--jp),
+// not from ourselves.
+//
+// Why needed:
+// - New nodes have no successor or finger table, so starting from themselves fails.
+// - Join must ask the EXISTING ring who the successor of our ID is.
+// - Allows Chord lookup to begin from a remote node instead of self.
+//
+//____
+//func (n *Node) FindFrom(start *RemoteNode, id *big.Int) *RemoteNode {
+//	current := start
+//
+//	n.mu.RLock()
+//	maxSteps := len(n.FingerTable)
+//	n.mu.RUnlock()
+//
+//	for i := 0; i < maxSteps; i++ {
+//		var reply findSuccessorReply
+//		ok := call(current.Addr, "Node.FindSuccessorRPC",
+//			&findSuccessorRequest{ID: id}, &reply)
+//		if !ok {
+//			return nil
+//		}
+//		if reply.Found {
+//			return reply.Node
+//		}
+//		current = reply.Node
+//	}
+//	return nil
+//}
+
+//____
+
+
 
 /*
 

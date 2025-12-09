@@ -2,20 +2,27 @@ package chord
 
 import (
 	"math/big"
+	"time"
 )
-
 // update finger table entries.
-func (n *Node) fixFingers() {
-	for i := range n.FingerTable {
-		start := computeFingerStart(n.id, i, len(n.FingerTable))
-		successor := n.Find(start)
-		if successor != nil {
-			n.mu.Lock()
-			n.FingerTable[i] = successor
-			n.mu.Unlock()
-		}
-	}
+func (n *Node) fixFinger(i int) {
+    n.mu.RLock()
+    m := len(n.FingerTable)
+    n.mu.RUnlock()
+
+    if m == 0 {
+        return
+    }
+
+    start := computeFingerStart(n.id, i, m)
+    succ := n.Find(start)
+    if succ != nil {
+        n.mu.Lock()
+        n.FingerTable[i] = succ
+        n.mu.Unlock()
+    }
 }
+
 
 /* n′ thinks it might be our predecessor.
 n.notify(n′)
@@ -157,6 +164,37 @@ n.check predecessor()
 */
 
 // while looping maintenance tasks
-func runMaintenance() {
+func(n *Node) runMaintenance() {
 	// kör stablize fixFingers jämna mellan rum
+
+	go func() {
+		for {
+			n.stabilize()
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
+
+	go func() {
+
+		for {
+			n.checkPredecessor()
+			time.Sleep(2 * time.Second)
+		}
+	}()
+	go func() {
+			nextFix := 0
+
+			for {
+				n.mu.RLock()
+				m := len(n.FingerTable)
+				n.mu.RUnlock()
+
+				if m > 0 {
+					n.fixFinger(nextFix)
+					nextFix = (nextFix + 1) % m
+				}
+
+				time.Sleep(500 * time.Millisecond)
+			}
+		}()
 }

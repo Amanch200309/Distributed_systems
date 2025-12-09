@@ -52,3 +52,7 @@ func NewNode(id *big.Int, addr string, m int) *Node {
 		FingerTable: fingers,
 	}
 }
+
+func (n *Node) ID()  {
+	
+}

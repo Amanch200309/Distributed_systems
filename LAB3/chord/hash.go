@@ -11,3 +11,4 @@ func hashKey(s string, m int) *big.Int {
 	mod := new(big.Int).Lsh(big.NewInt(1), uint(m))
 	return new(big.Int).Mod(n, mod)
 }
+
