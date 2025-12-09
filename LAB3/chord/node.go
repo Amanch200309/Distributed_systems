@@ -41,11 +41,14 @@ type Node struct {
 	FingerTable []*RemoteNode // borde va lista på närmsta noder m lång ränkar ut index med 2 pow(n->m)
 }
 
-func NewNode(id string, addr string, m int) *Node {
-	fingers := make([]string, m)
+func NewNode(id *big.Int, addr string, m int) *Node {
+	fingers := make([]*RemoteNode, m)
+	self := &RemoteNode{ID: id, Addr: addr}
 	return &Node{
 		id:          id,
 		Address:     addr,
+		Predecessor: nil,
+		Successor:   self,
 		FingerTable: fingers,
 	}
 }

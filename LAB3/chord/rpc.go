@@ -1,93 +1,93 @@
 package chord
 
 import (
-	"fmt"
 	"log"
+	"math/big"
 	"net"
-	"net/http"
 	"net/rpc"
-	"strings"
-	"time"
-
-	"google.golang.org/grpc"
 )
 
-func (c *Chord) server(address string) {
-	rpc.Register(c)
-	rpc.HandleHTTP()
+// rpcs method
+func (n *Node) FindSuccessorRPC(args *findSuccessorRequest, reply *findSuccessorReply) error {
 
-	l, e := net.Listen("tcp", ":8080")
-	if e != nil {
-		log.Fatal("listen error:", e)
-	}
-	go http.Serve(l, nil)
+	found, next := n.findSuccessor(args.ID)
+
+	reply.Found = found
+	reply.Node = next
+
+	return nil
 }
 
-// resolveAddress handles :port format by adding the local address
-func resolveAddress(address string) string {
-	if strings.HasPrefix(address, ":") {
-		return net.JoinHostPort(localaddress, address[1:])
-	} else if !strings.Contains(address, ":") {
-		return net.JoinHostPort(address, defaultPort)
-	}
-	return address
+func (n *Node) GetPredecessorRPC(arg getPredecessorRequest, reply getPredecessorReply) error {
+	reply.Node = n.Predecessor
+	return nil
 }
 
-// StartServer starts the gRPC server for this node
-func StartServer(address string, nprime string) (*Node, error) {
-	address = resolveAddress(address)
+func (rn *RemoteNode) NotifyRPC(n *RemoteNode) error
 
-	node := &Node{
-		Address:     address,
-		FingerTable: make([]string, keySize+1),
-		Predecessor: "",
-		Successors:  nil,
-		Bucket:      make(map[string]string),
-	}
+func (rn *Node) PingRPC(arg pingRequest, reply pingReply) error {
+	reply.Alive = true
+	return nil
+}
 
-	// Are we the first node?
-	if nprime == "" {
-		log.Print("StartServer: creating new ring")
-		node.Successors = []string{node.Address}
-	} else {
-		log.Print("StartServer: joining existing ring using ", nprime)
-		// For now use the given address as our successor
-		nprime = resolveAddress(nprime)
-		node.Successors = []string{nprime}
-		// TODO: use a GetAll request to populate our bucket
-	}
+// RPC request and reply types
 
-	// Start listening for RPC calls
-	grpcServer := grpc.NewServer()
-	pb.RegisterChordServer(grpcServer, node)
+type findSuccessorRequest struct {
+	ID *big.Int
+}
 
-	lis, err := net.Listen("tcp", node.Address)
+type findSuccessorReply struct {
+	Found bool
+	Node  *RemoteNode
+}
+
+type getPredecessorRequest struct {
+	//TODO:
+}
+
+type getPredecessorReply struct {
+	Node *RemoteNode
+}
+
+type notifyRequest struct {
+	Node *RemoteNode
+}
+
+type notifyReply struct {
+}
+type pingRequest struct {
+}
+type pingReply struct {
+	Alive bool
+}
+
+func call(address string, rpcname string, args interface{}, reply interface{}) bool {
+	c, err := rpc.Dial("tcp", address)
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen: %v", err)
+		return false
 	}
+	defer c.Close()
 
-	// Start server in goroutine
-	log.Printf("Starting Chord node server on %s", node.Address)
-	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("failed to serve: %v", err)
-		}
-	}()
+	err = c.Call(rpcname, args, reply)
+	return err == nil
+}
 
-	// Start background tasks
+func startRPCServer(address string, port string) error {
+	server := rpc.NewServer()
+
+	l, err := net.Listen("tcp", address+":"+port)
+	if err != nil {
+		log.Fatal("listen error:", err)
+	}
 	go func() {
-		nextFinger := 0
 		for {
-			time.Sleep(time.Second / 3)
-			node.stabilize()
-
-			time.Sleep(time.Second / 3)
-			nextFinger = node.fixFingers(nextFinger)
-
-			time.Sleep(time.Second / 3)
-			node.checkPredecessor()
+			conn, err := l.Accept()
+			if err != nil {
+				log.Fatal("accept error:", err)
+			}
+			go server.ServeConn(conn) // handle connections concurrently from multiple clients
 		}
 	}()
+	return nil
 
-	return node, nil
 }

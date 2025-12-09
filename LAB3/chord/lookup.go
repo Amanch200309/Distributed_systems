@@ -6,10 +6,11 @@ import "math/big"
 func (n *Node) findSuccessor(id *big.Int) (bool, *RemoteNode) {
 	n.mu.RLock()
 	succ := n.Successor
+	selfID := n.id
 	n.mu.RUnlock()
 
 	// If ID lies between n and successor, successor is correct
-	if n.between(n.id, id, succ.ID) || id.Cmp(succ.ID) == 0 {
+	if n.between(selfID, id, succ.ID) || id.Cmp(succ.ID) == 0 {
 		return true, succ
 	}
 
