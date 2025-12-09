@@ -23,7 +23,10 @@ func (n *Node) GetPredecessorRPC(arg getPredecessorRequest, reply getPredecessor
 	return nil
 }
 
-func (rn *RemoteNode) NotifyRPC(n *RemoteNode) error
+func (n *Node) NotifyRPC(arg notifyRequest, reply notifyReply) error {
+	n.notify(arg.Node)
+	return nil
+}
 
 func (rn *Node) PingRPC(arg pingRequest, reply pingReply) error {
 	reply.Alive = true

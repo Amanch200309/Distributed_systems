@@ -48,6 +48,32 @@ func (n *Node) between(start, id, end *big.Int) bool {
 	}
 }
 
+// iterativt kolla alla noder i chord efter id och returna succ
+func (n *Node) Find(id *big.Int) *RemoteNode {
+	current := &RemoteNode{ID: n.id, Addr: n.Address}
+
+	// m is the size of the finger table (equal to hash length)
+	n.mu.RLock()
+	maxSteps := len(n.FingerTable)
+	n.mu.RUnlock()
+
+	for i := 0; i < maxSteps; i++ {
+		var reply findSuccessorReply
+		ok := call(current.Addr, "Node.FindSuccessorRPC", &findSuccessorRequest{ID: id}, &reply)
+		if !ok {
+			return nil
+		}
+
+		if reply.Found {
+			return reply.Node
+		}
+
+		current = reply.Node
+	}
+
+	return nil // failed after m steps
+}
+
 /*
 
 // ask node n to find the successor of id
