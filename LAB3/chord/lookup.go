@@ -59,7 +59,6 @@ func (n *Node) between(start, id, end *big.Int) bool {
 // - Local lookups (Lookup, StoreFile, PrintState) must begin at our node.
 // - Correct because our node is already in the ring.
 // - Cannot be used for Join(), because Join must start from the bootstrap node.
-//
 func (n *Node) Find(id *big.Int) *RemoteNode {
 	current := &RemoteNode{ID: n.id, Addr: n.Address}
 
@@ -69,8 +68,8 @@ func (n *Node) Find(id *big.Int) *RemoteNode {
 	n.mu.RUnlock()
 
 	for i := 0; i < maxSteps; i++ {
-		var reply findSuccessorReply
-		ok := call(current.Addr, "Node.FindSuccessorRPC", &findSuccessorRequest{ID: id}, &reply)
+		var reply FindSuccessorReply
+		ok := call(current.Addr, "Node.FindSuccessorRPC", &FindSuccessorRequest{ID: id}, &reply)
 		if !ok {
 			return nil
 		}
@@ -121,8 +120,6 @@ func (n *Node) Find(id *big.Int) *RemoteNode {
 //}
 
 //____
-
-
 
 /*
 

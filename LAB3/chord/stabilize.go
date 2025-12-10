@@ -4,25 +4,25 @@ import (
 	"math/big"
 	"time"
 )
+
 // update finger table entries.
 func (n *Node) fixFinger(i int) {
-    n.mu.RLock()
-    m := len(n.FingerTable)
-    n.mu.RUnlock()
+	n.mu.RLock()
+	m := len(n.FingerTable)
+	n.mu.RUnlock()
 
-    if m == 0 {
-        return
-    }
+	if m == 0 {
+		return
+	}
 
-    start := computeFingerStart(n.id, i, m)
-    succ := n.Find(start)
-    if succ != nil {
-        n.mu.Lock()
-        n.FingerTable[i] = succ
-        n.mu.Unlock()
-    }
+	start := computeFingerStart(n.id, i, m)
+	succ := n.Find(start)
+	if succ != nil {
+		n.mu.Lock()
+		n.FingerTable[i] = succ
+		n.mu.Unlock()
+	}
 }
-
 
 /* n′ thinks it might be our predecessor.
 n.notify(n′)
@@ -64,8 +64,8 @@ func (n *Node) stabilize() {
 	}
 
 	//   x = successor.predecessor; fråga sucessor om sin predecessor
-	var reply getPredecessorReply
-	ok := call(succ.Addr, "Node.GetPredecessorRPC", &getPredecessorRequest{}, &reply)
+	var reply GetPredecessorReply
+	ok := call(succ.Addr, "Node.GetPredecessorRPC", &GetPredecessorRequest{}, &reply)
 	if ok && reply.Node != nil {
 		x := reply.Node
 
@@ -82,9 +82,9 @@ func (n *Node) stabilize() {
 	n.mu.RUnlock()
 
 	// successor.notify(n);
-	req := &notifyRequest{Node: &RemoteNode{ID: id, Addr: nAddr}}
+	req := &NotifyRequest{Node: &RemoteNode{ID: id, Addr: nAddr}}
 
-	var reply_2 notifyReply
+	var reply_2 NotifyReply
 
 	call(succAddr, "Node.NotifyRPC", &req, &reply_2) // notify successor om mig själv
 	//ex 21 -> 45 -> 10 då måste 10 notify 21 om 45
@@ -103,8 +103,8 @@ func (n *Node) checkPredecessor() {
 	n.mu.RUnlock()
 
 	if pred != nil {
-		var reply pingReply
-		ok := call(pred.Addr, "Node.PingRPC", &pingRequest{}, &reply)
+		var reply PingReply
+		ok := call(pred.Addr, "Node.PingRPC", &PingRequest{}, &reply)
 		if !ok || !reply.Alive { // if call failed or not alive
 			n.mu.Lock()
 			n.Predecessor = nil
@@ -164,7 +164,7 @@ n.check predecessor()
 */
 
 // while looping maintenance tasks
-func(n *Node) runMaintenance() {
+func (n *Node) runMaintenance() {
 	// kör stablize fixFingers jämna mellan rum
 
 	go func() {
@@ -182,19 +182,19 @@ func(n *Node) runMaintenance() {
 		}
 	}()
 	go func() {
-			nextFix := 0
+		nextFix := 0
 
-			for {
-				n.mu.RLock()
-				m := len(n.FingerTable)
-				n.mu.RUnlock()
+		for {
+			n.mu.RLock()
+			m := len(n.FingerTable)
+			n.mu.RUnlock()
 
-				if m > 0 {
-					n.fixFinger(nextFix)
-					nextFix = (nextFix + 1) % m
-				}
-
-				time.Sleep(500 * time.Millisecond)
+			if m > 0 {
+				n.fixFinger(nextFix)
+				nextFix = (nextFix + 1) % m
 			}
-		}()
+
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
 }

@@ -8,14 +8,14 @@ import (
 )
 
 func (n *Node) FindRPC(args *FindRequest, reply *FindReply) error {
-    // Use the node's full local Find() implementation
-    succ := n.Find(args.ID)
-    reply.Node = succ
-    return nil
+	// Use the node's full local Find() implementation
+	succ := n.Find(args.ID)
+	reply.Node = succ
+	return nil
 }
 
 // rpcs method
-func (n *Node) FindSuccessorRPC(args *findSuccessorRequest, reply *findSuccessorReply) error {
+func (n *Node) FindSuccessorRPC(args *FindSuccessorRequest, reply *FindSuccessorReply) error {
 
 	found, next := n.findSuccessor(args.ID)
 
@@ -25,62 +25,60 @@ func (n *Node) FindSuccessorRPC(args *findSuccessorRequest, reply *findSuccessor
 	return nil
 }
 
-func (n *Node) GetPredecessorRPC(arg getPredecessorRequest, reply getPredecessorReply) error {
+func (n *Node) GetPredecessorRPC(arg GetPredecessorRequest, reply GetPredecessorReply) error {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	reply.Node = n.Predecessor
 	return nil
 }
 
-func (n *Node) NotifyRPC(arg notifyRequest, reply notifyReply) error {
+func (n *Node) NotifyRPC(arg NotifyRequest, reply NotifyReply) error {
 	n.notify(arg.Node)
 	return nil
 }
 
-func (rn *Node) PingRPC(arg pingRequest, reply pingReply) error {
+func (rn *Node) PingRPC(arg PingRequest, reply PingReply) error {
 	reply.Alive = true
 	return nil
 }
 
-
-
 // RPC request and reply types
 
-type findSuccessorRequest struct {
+type FindSuccessorRequest struct {
 	ID *big.Int
 }
 
-type findSuccessorReply struct {
+type FindSuccessorReply struct {
 	Found bool
 	Node  *RemoteNode
 }
 
-type getPredecessorRequest struct {
+type GetPredecessorRequest struct {
 	//TODO:
 }
 
-type getPredecessorReply struct {
+type GetPredecessorReply struct {
 	Node *RemoteNode
 }
 
-type notifyRequest struct {
+type NotifyRequest struct {
 	Node *RemoteNode
 }
 
-type notifyReply struct {
+type NotifyReply struct {
 }
-type pingRequest struct {
+type PingRequest struct {
 }
-type pingReply struct {
+type PingReply struct {
 	Alive bool
 }
 
 type FindRequest struct {
-    ID *big.Int
+	ID *big.Int
 }
 
 type FindReply struct {
-    Node *RemoteNode
+	Node *RemoteNode
 }
 
 func call(address string, rpcname string, args interface{}, reply interface{}) bool {
