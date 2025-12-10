@@ -32,27 +32,44 @@ type RemoteNode struct {
 
 // Node represents a node in the Chord DHT
 type Node struct {
-	id *big.Int // fix later TODO:   // hashed id, vi definerar vad id är sen kanske ip? vem vet // det är hash(ip)
+	id *big.Int // hashed id
 	mu sync.RWMutex
 
-	Address     string        // ip string
-	Predecessor *RemoteNode   // node innan oss kanske Node typ istället så de blir linked list?
-	Successor   *RemoteNode   // varför lista inte vet
-	FingerTable []*RemoteNode // borde va lista på närmsta noder m lång ränkar ut index med 2 pow(n->m)
+	Address     string            // ip:port string
+	Predecessor *RemoteNode       // predecessor node
+	Successor   *RemoteNode       // primary successor (for compatibility)
+	Successors  []*RemoteNode     // successor list
+	FingerTable []*RemoteNode     // finger table (m entries)
+	Data        map[string]string // filename -> file content
+	M           int               // hash bit length
+
+	// Maintenance timing (milliseconds)
+	StabilizeInterval        int
+	FixFingersInterval       int
+	CheckPredecessorInterval int
 }
 
-func NewNode(id *big.Int, addr string, m int) *Node {
+func NewNode(id *big.Int, addr string, m int, r int, ts int, tff int, tcp int) *Node {
 	fingers := make([]*RemoteNode, m)
+	successors := make([]*RemoteNode, r)
 	self := &RemoteNode{ID: id, Addr: addr}
 	return &Node{
-		id:          id,
-		Address:     addr,
-		Predecessor: nil,
-		Successor:   self,
-		FingerTable: fingers,
+		id:                       id,
+		Address:                  addr,
+		Predecessor:              nil,
+		Successor:                self,
+		Successors:               successors,
+		FingerTable:              fingers,
+		Data:                     make(map[string]string),
+		M:                        m,
+		StabilizeInterval:        ts,
+		FixFingersInterval:       tff,
+		CheckPredecessorInterval: tcp,
 	}
 }
 
-func (n *Node) ID()  {
-	
+func (n *Node) GetID() *big.Int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.id
 }

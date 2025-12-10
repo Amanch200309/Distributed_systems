@@ -165,22 +165,23 @@ n.check predecessor()
 
 // while looping maintenance tasks
 func (n *Node) runMaintenance() {
-	// kör stablize fixFingers jämna mellan rum
-
+	// Run stabilize at configured interval
 	go func() {
 		for {
 			n.stabilize()
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(time.Duration(n.StabilizeInterval) * time.Millisecond)
 		}
 	}()
 
+	// Run checkPredecessor at configured interval
 	go func() {
-
 		for {
 			n.checkPredecessor()
-			time.Sleep(2 * time.Second)
+			time.Sleep(time.Duration(n.CheckPredecessorInterval) * time.Millisecond)
 		}
 	}()
+
+	// Run fixFingers at configured interval
 	go func() {
 		nextFix := 0
 
@@ -194,7 +195,7 @@ func (n *Node) runMaintenance() {
 				nextFix = (nextFix + 1) % m
 			}
 
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(time.Duration(n.FixFingersInterval) * time.Millisecond)
 		}
 	}()
 }

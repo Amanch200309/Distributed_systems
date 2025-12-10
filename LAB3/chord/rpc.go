@@ -25,19 +25,19 @@ func (n *Node) FindSuccessorRPC(args *FindSuccessorRequest, reply *FindSuccessor
 	return nil
 }
 
-func (n *Node) GetPredecessorRPC(arg GetPredecessorRequest, reply GetPredecessorReply) error {
+func (n *Node) GetPredecessorRPC(arg *GetPredecessorRequest, reply *GetPredecessorReply) error {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	reply.Node = n.Predecessor
 	return nil
 }
 
-func (n *Node) NotifyRPC(arg NotifyRequest, reply NotifyReply) error {
+func (n *Node) NotifyRPC(arg *NotifyRequest, reply *NotifyReply) error {
 	n.notify(arg.Node)
 	return nil
 }
 
-func (rn *Node) PingRPC(arg PingRequest, reply PingReply) error {
+func (n *Node) PingRPC(arg *PingRequest, reply *PingReply) error {
 	reply.Alive = true
 	return nil
 }
@@ -92,12 +92,23 @@ func call(address string, rpcname string, args interface{}, reply interface{}) b
 	return err == nil
 }
 
-func startRPCServer(address string, port string) error {
+// CallPublic is an exported version of call for use in main package
+func CallPublic(address string, rpcname string, args interface{}, reply interface{}) bool {
+	return call(address, rpcname, args, reply)
+}
+
+func startRPCServer(n *Node, address string, port string) error {
 	server := rpc.NewServer()
+	err := server.Register(n)
+	if err != nil {
+		log.Fatal("RPC registration error:", err)
+		return err
+	}
 
 	l, err := net.Listen("tcp", address+":"+port)
 	if err != nil {
 		log.Fatal("listen error:", err)
+		return err
 	}
 	go func() {
 		for {
@@ -105,9 +116,8 @@ func startRPCServer(address string, port string) error {
 			if err != nil {
 				log.Fatal("accept error:", err)
 			}
-			go server.ServeConn(conn) // handle connections concurrently from multiple clients
+			go server.ServeConn(conn)
 		}
 	}()
 	return nil
-
 }
