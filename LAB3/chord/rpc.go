@@ -10,7 +10,14 @@ import (
 func (n *Node) FindRPC(args *FindRequest, reply *FindReply) error {
 	// Use the node's full local Find() implementation
 	succ := n.Find(args.ID)
-	reply.Node = succ
+	if succ == nil {
+		// Return self as fallback if lookup fails
+		n.mu.RLock()
+		reply.Node = &RemoteNode{ID: n.ID, Addr: n.Address}
+		n.mu.RUnlock()
+	} else {
+		reply.Node = succ
+	}
 	return nil
 }
 
@@ -20,7 +27,14 @@ func (n *Node) FindSuccessorRPC(args *FindSuccessorRequest, reply *FindSuccessor
 	found, next := n.findSuccessor(args.ID)
 
 	reply.Found = found
-	reply.Node = next
+	// Ensure we never return nil
+	if next == nil {
+		n.mu.RLock()
+		reply.Node = &RemoteNode{ID: n.ID, Addr: n.Address}
+		n.mu.RUnlock()
+	} else {
+		reply.Node = next
+	}
 
 	return nil
 }
@@ -128,6 +142,26 @@ type FindRequest struct {
 
 type FindReply struct {
 	Node *RemoteNode
+}
+
+type GetSuccessorListRequest struct {
+}
+
+type GetSuccessorListReply struct {
+	Successors []*RemoteNode
+}
+
+func (n *Node) GetSuccessorListRPC(args *GetSuccessorListRequest, reply *GetSuccessorListReply) error {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	// Filter out nil entries to avoid gob encoding errors
+	reply.Successors = make([]*RemoteNode, 0, len(n.Successors))
+	for _, succ := range n.Successors {
+		if succ != nil {
+			reply.Successors = append(reply.Successors, succ)
+		}
+	}
+	return nil
 }
 
 func call(address string, rpcname string, args interface{}, reply interface{}) bool {

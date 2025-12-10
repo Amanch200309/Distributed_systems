@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"bufio"
 	"strings"
+	"math/big"
 
 	"github.com/Amanch200309/Distributed_systems/LAB3/chord"
 )
@@ -38,7 +39,7 @@ var (
 	tcp = flag.Int("tcp", 0, "Time in milliseconds between invocations of 'check predecessor'") // tcp, time check predecessor
 
 	r = flag.Int("r", 0, "Number of successors maintained by the Chord client") // r, number of successors
-
+	i = flag.String("i", "", "The identifier (ID) assigned to the Chord client (40 hex chars)")
 )
 
 func main() {
@@ -63,12 +64,31 @@ func main() {
 		log.Fatal("--ja and --jp must both be specified together")
 	}
 
+	// Validate -i flag format if provided
+	if *i != "" {
+		if len(*i) != 40 {
+			log.Fatal("-i must be exactly 40 characters")
+		}
+		for _, c := range *i {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+				log.Fatal("-i must contain only hex characters [0-9a-fA-F]")
+			}
+		}
+	}
+
 	// create node 
 	addr := *address + ":" + *port
 
-	hashLen := 20 // TODO:
+	hashLen := 20 // 20 bytes = 160 bits for SHA-1
 
-	nodeID := chord.HashKey(addr, hashLen) //sha1 hash of addr
+	var nodeID *big.Int
+	if *i != "" {
+		// Use custom ID if provided
+		nodeID = new(big.Int)
+		nodeID.SetString(*i, 16)
+	} else {
+		nodeID = chord.HashKey(addr, hashLen) //sha1 hash of addr
+	}
 	node := chord.NewNode(nodeID,addr,hashLen,*r) // Create node
 	// start server 
 	go chord.StartRPCServer(node, *address, *port)
@@ -145,12 +165,27 @@ func handleCommands(n *chord.Node) {
 					fmt.Println("Usage: Lookup <filename>")
 					continue
 				}
-				remote, _, err := n.Lookup(parts[1]) //lookup filename
+				remote, data, err := n.Lookup(parts[1]) //lookup filename
 				if err != nil  {
 					fmt.Printf("Look up failed for Node: %s with error: %s \n",n.ID.Text(16), err)
 					continue
 				}
-				fmt.Printf("File owned by Node ID=%s, Addr=%s \n",remote.ID.Text(16),remote.Addr)
+				// Split address to show IP and port separately
+				addrParts := strings.Split(remote.Addr, ":")
+				ip := addrParts[0]
+				port := ""
+				if len(addrParts) > 1 {
+					port = addrParts[1]
+				}
+				fmt.Printf("File '%s' found:\n", parts[1])
+				fmt.Printf("  Node ID: %s\n", remote.ID.Text(16))
+				fmt.Printf("  IP Address: %s\n", ip)
+				fmt.Printf("  Port: %s\n", port)
+				if data != nil && len(data) > 0 {
+					fmt.Printf("  Contents:\n%s\n", string(data))
+				} else {
+					fmt.Println("  File not found or empty")
+				}
 			case "storefile":
 				if len(parts) != 2 {
 					fmt.Println("Usage: StoreFile <filepath>")

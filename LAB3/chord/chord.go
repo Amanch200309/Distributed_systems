@@ -48,6 +48,12 @@ func (n *Node) Create() {
 	defer n.mu.Unlock()
 
 	n.Predecessor = nil
-	n.Successors[0] = &RemoteNode{ID: n.ID, Addr: n.Address}
+	self := &RemoteNode{ID: n.ID, Addr: n.Address}
+	n.Successors[0] = self
+	
+	// Initialize all finger table entries to self
+	for i := range n.FingerTable {
+		n.FingerTable[i] = self
+	}
 }
 
