@@ -122,15 +122,26 @@ func (n *Node) PrintState() {
 		}
 	}
 
-	// Finger table
-	fmt.Printf("\nFinger Table:\n")
+	// Finger table - show only unique entries or important ones
+	fmt.Printf("\nFinger Table (unique entries):\n")
+	seen := make(map[string]bool)
+	count := 0
 	for i, finger := range n.FingerTable {
 		if finger != nil {
-			start := computeFingerStart(n.id, i, n.M)
-			fmt.Printf("  [%d] start: %s, node: %s (%s)\n",
-				i, start.Text(16), finger.ID.Text(16), finger.Addr)
+			key := finger.ID.Text(16) + finger.Addr
+			// Show first occurrence of each unique node, or important indices
+			if !seen[key] || i == 0 || i == len(n.FingerTable)/4 || i == len(n.FingerTable)/2 || i == len(n.FingerTable)-1 {
+				if !seen[key] {
+					count++
+					seen[key] = true
+				}
+				start := computeFingerStart(n.id, i, n.M)
+				fmt.Printf("  [%d] start: %s..., node: %s... (%s)\n",
+					i, start.Text(16)[:16], finger.ID.Text(16)[:16], finger.Addr)
+			}
 		}
 	}
+	fmt.Printf("  Total: %d entries, %d unique nodes\n", len(n.FingerTable), count)
 
 	fmt.Println("========================================")
 }

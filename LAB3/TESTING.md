@@ -6,10 +6,10 @@ To build the Chord application:
 
 ```bash
 cd /home/d4n3r/Desktop/Distributed_systems/LAB3
-go build -o chord ./app/main.go
+go build -o chord-dht ./app/main.go
 ```
 
-This will create an executable named `chord` in the current directory.
+This will create an executable named `chord-dht` in the current directory.
 
 ## Running Chord Nodes
 
@@ -18,7 +18,7 @@ This will create an executable named `chord` in the current directory.
 To create a new Chord ring:
 
 ```bash
-./chord -a 127.0.0.1 -p 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 Parameters:
@@ -35,17 +35,17 @@ Open new terminal windows and run:
 
 **Node 2:**
 ```bash
-./chord -a 127.0.0.1 -p 8002 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8002 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 **Node 3:**
 ```bash
-./chord -a 127.0.0.1 -p 8003 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8003 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 **Node 4:**
 ```bash
-./chord -a 127.0.0.1 -p 8004 --ja 127.0.0.1 --jp 8002 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8004 --ja 127.0.0.1 --jp 8002 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 Parameters for joining:
@@ -76,9 +76,9 @@ This displays:
 Create a test file first:
 
 ```bash
-echo "Hello from Chord DHT!" > /tmp/test.txt
-echo "This is another test file." > /tmp/test2.txt
-echo "Distributed systems are cool!" > /tmp/test3.txt
+echo 'Hello from Chord DHT!' > /tmp/test.txt
+echo 'This is another test file.' > /tmp/test2.txt
+echo 'Distributed systems are cool!' > /tmp/test3.txt
 ```
 
 Then store files in the ring:
@@ -112,21 +112,21 @@ Open 3 terminal windows:
 
 **Terminal 1 (Node 1):**
 ```bash
-./chord -a 127.0.0.1 -p 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 Wait a few seconds, then:
 
 **Terminal 2 (Node 2):**
 ```bash
-./chord -a 127.0.0.1 -p 8002 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8002 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 Wait a few seconds, then:
 
 **Terminal 3 (Node 3):**
 ```bash
-./chord -a 127.0.0.1 -p 8003 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8003 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 ### Step 2: Wait for Stabilization
@@ -149,9 +149,9 @@ You should see:
 
 Create test files:
 ```bash
-echo "File 1 content" > /tmp/file1.txt
-echo "File 2 content" > /tmp/file2.txt
-echo "File 3 content" > /tmp/file3.txt
+echo 'File 1 content' > /tmp/file1.txt
+echo 'File 2 content' > /tmp/file2.txt
+echo 'File 3 content' > /tmp/file3.txt
 ```
 
 In any node's terminal, store files:
@@ -221,10 +221,10 @@ Start 5-10 nodes to see better distribution:
 for i in {1..10}; do
   port=$((8000 + i))
   if [ $i -eq 1 ]; then
-    ./chord -a 127.0.0.1 -p $port --ts 3000 --tff 1000 --tcp 3000 -r 4 &
+    ./chord-dht -a 127.0.0.1 -p $port --ts 3000 --tff 1000 --tcp 3000 -r 4 &
   else
     sleep 2
-    ./chord -a 127.0.0.1 -p $port --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4 &
+    ./chord-dht -a 127.0.0.1 -p $port --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4 &
   fi
 done
 ```

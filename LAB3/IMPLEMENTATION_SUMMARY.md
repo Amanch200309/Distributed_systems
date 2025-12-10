@@ -162,13 +162,13 @@ For cloud deployment:
 
 ```bash
 # Build
-go build -o chord ./app/main.go
+go build -o chord-dht ./app/main.go
 
 # Create new ring
-./chord -a 127.0.0.1 -p 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 
 # Join existing ring
-./chord -a 127.0.0.1 -p 8002 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8002 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 See TESTING.md for comprehensive testing guide.

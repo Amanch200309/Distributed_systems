@@ -4,24 +4,24 @@
 
 ```bash
 cd /home/d4n3r/Desktop/Distributed_systems/LAB3
-go build -o chord ./app/main.go
+go build -o chord-dht ./app/main.go
 ```
 
 ## Quick Test (3 Nodes)
 
 ### Terminal 1 - Start First Node
 ```bash
-./chord -a 127.0.0.1 -p 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 ### Terminal 2 - Join Second Node (wait 3 seconds first)
 ```bash
-./chord -a 127.0.0.1 -p 8002 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8002 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 ### Terminal 3 - Join Third Node (wait 3 seconds first)
 ```bash
-./chord -a 127.0.0.1 -p 8003 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
+./chord-dht -a 127.0.0.1 -p 8003 --ja 127.0.0.1 --jp 8001 --ts 3000 --tff 1000 --tcp 3000 -r 4
 ```
 
 ## Test Commands
@@ -35,8 +35,8 @@ In any terminal:
 ### 2. Store Files
 First, create test files:
 ```bash
-echo "Hello World" > /tmp/hello.txt
-echo "Test data" > /tmp/test.txt
+echo 'Hello World' > /tmp/hello.txt
+echo 'Test data' > /tmp/test.txt
 ```
 
 Then in any node terminal:
