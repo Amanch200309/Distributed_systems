@@ -5,8 +5,8 @@ import "math/big"
 // ask node n to find the successor of id
 func (n *Node) findSuccessor(id *big.Int) (bool, *RemoteNode) {
 	n.mu.RLock()
-	succ := n.Successor
-	selfID := n.id
+	succ := n.Successors[0]
+	selfID := n.ID
 	n.mu.RUnlock()
 
 	// If ID lies between n and successor, successor is correct
@@ -27,11 +27,11 @@ func (n *Node) closestPrecedingNode(id *big.Int) *RemoteNode {
 	// TODO
 	for i := len(n.FingerTable) - 1; i >= 0; i-- {
 		f := n.FingerTable[i]
-		if f != nil && n.between(n.id, f.ID, id) {
+		if f != nil && n.between(n.ID, f.ID, id) {
 			return f
 		}
 	}
-	return &RemoteNode{ID: n.id, Addr: n.Address} // TODO: se över lista
+	return n.Successors[0]// 
 }
 
 func (n *Node) between(start, id, end *big.Int) bool {
@@ -60,7 +60,7 @@ func (n *Node) between(start, id, end *big.Int) bool {
 // - Correct because our node is already in the ring.
 // - Cannot be used for Join(), because Join must start from the bootstrap node.
 func (n *Node) Find(id *big.Int) *RemoteNode {
-	current := &RemoteNode{ID: n.id, Addr: n.Address}
+	current := &RemoteNode{ID: n.ID, Addr: n.Address}
 
 	// m is the size of the finger table (equal to hash length)
 	n.mu.RLock()

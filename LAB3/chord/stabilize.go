@@ -3,6 +3,7 @@ package chord
 import (
 	"math/big"
 	"time"
+	
 )
 
 // update finger table entries.
@@ -15,7 +16,7 @@ func (n *Node) fixFinger(i int) {
 		return
 	}
 
-	start := computeFingerStart(n.id, i, m)
+	start := computeFingerStart(n.ID, i, m)
 	succ := n.Find(start)
 	if succ != nil {
 		n.mu.Lock()
@@ -31,21 +32,21 @@ n.notify(n′)
 */
 // notify en node att jag kanske är din predecessor
 func (n *Node) notify(x *RemoteNode) {
-	if n.Predecessor == nil || n.between(n.Predecessor.ID, x.ID, n.id) {
+	if n.Predecessor == nil || n.between(n.Predecessor.ID, x.ID, n.ID) {
 		n.Predecessor = x
 	}
 }
 
+// start = (n + 2ⁱ) mod 2ᵐ
 func computeFingerStart(id *big.Int, i int, m int) *big.Int {
-	two := big.NewInt(2)
-	//2^i
+	two := big.NewInt(2)                                     // 2
 	twoI := new(big.Int).Exp(two, big.NewInt(int64(i)), nil) // 2^i
 	// n+ 2^i                     n = id   i = finger index  m = hash len
-	start := new(big.Int).Add(id, twoI)
+	start := new(big.Int).Add(id, twoI) // n + 2^i
 	// mod 2^m
-	mod := new(big.Int).Exp(two, big.NewInt(int64(m)), nil)
+	mod := new(big.Int).Exp(two, big.NewInt(int64(m)), nil) // 2^m
 
-	start.Mod(start, mod)
+	start.Mod(start, mod) // n+ 2^i mod 2^m
 
 	return start
 
@@ -53,8 +54,8 @@ func computeFingerStart(id *big.Int, i int, m int) *big.Int {
 
 func (n *Node) stabilize() {
 	n.mu.RLock()
-	succ := n.Successor
-	id := n.id
+	succ := n.Successors[0]
+	id := n.ID
 	nAddr := n.Address
 	n.mu.RUnlock()
 
@@ -66,13 +67,15 @@ func (n *Node) stabilize() {
 	//   x = successor.predecessor; fråga sucessor om sin predecessor
 	var reply GetPredecessorReply
 	ok := call(succ.Addr, "Node.GetPredecessorRPC", &GetPredecessorRequest{}, &reply)
+	
+
 	if ok && reply.Node != nil {
 		x := reply.Node
 
 		if n.between(id, x.ID, succ.ID) { //  id < x < succ  se figure 7 i papperet
 			n.mu.Lock()
 			succ = x
-			n.Successor = x
+			n.Successors[0] = x
 			n.mu.Unlock()
 		}
 	}
@@ -164,13 +167,13 @@ n.check predecessor()
 */
 
 // while looping maintenance tasks
-func (n *Node) runMaintenance() {
+func (n *Node) RunMaintenance(ts int, tff int, tcp int) {
 	// kör stablize fixFingers jämna mellan rum
 
 	go func() {
 		for {
 			n.stabilize()
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(time.Duration(ts) * time.Millisecond)
 		}
 	}()
 
@@ -178,7 +181,7 @@ func (n *Node) runMaintenance() {
 
 		for {
 			n.checkPredecessor()
-			time.Sleep(2 * time.Second)
+			time.Sleep(time.Duration(tcp) * time.Millisecond)
 		}
 	}()
 	go func() {
@@ -194,7 +197,7 @@ func (n *Node) runMaintenance() {
 				nextFix = (nextFix + 1) % m
 			}
 
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(time.Duration(tff) * time.Millisecond)
 		}
 	}()
 }

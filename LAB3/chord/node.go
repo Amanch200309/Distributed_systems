@@ -5,26 +5,6 @@ import (
 	"sync"
 )
 
-/*
-type RemoteNode struct {
-    ID   *big.Int
-    Addr string
-}
-
-type Node struct {
-    mu           sync.RWMutex
-    ID           *big.Int
-    Address      string
-    Predecessor  *RemoteNode
-    Successors   []*RemoteNode
-    FingerTable  []*RemoteNode
-    Data         map[string]string   // filename → content
-    M            int
-}
-
-
-*/
-
 type RemoteNode struct {
 	ID   *big.Int
 	Addr string
@@ -32,27 +12,40 @@ type RemoteNode struct {
 
 // Node represents a node in the Chord DHT
 type Node struct {
-	id *big.Int // fix later TODO:   // hashed id, vi definerar vad id är sen kanske ip? vem vet // det är hash(ip)
+	ID *big.Int
 	mu sync.RWMutex
 
-	Address     string        // ip string
-	Predecessor *RemoteNode   // node innan oss kanske Node typ istället så de blir linked list?
-	Successor   *RemoteNode   // varför lista inte vet
-	FingerTable []*RemoteNode // borde va lista på närmsta noder m lång ränkar ut index med 2 pow(n->m)
+	Address       string
+	Predecessor   *RemoteNode
+	Successors    []*RemoteNode   // successor list of size r
+	FingerTable   []*RemoteNode   // size m
+	m             int
+	r             int
+	Data 		  map[string][]byte    // files to store 
 }
 
-func NewNode(id *big.Int, addr string, m int) *Node {
-	fingers := make([]*RemoteNode, m)
+
+func NewNode(id *big.Int, addr string, m int, numSucc int) *Node {
 	self := &RemoteNode{ID: id, Addr: addr}
+
+	// successor list (size numSucc)
+	succList := make([]*RemoteNode, numSucc)
+	succList[0] = self // first element always self until join()
+
+	// finger table (size m)
+	fingers := make([]*RemoteNode, m)
+
 	return &Node{
-		id:          id,
+		ID:          id,
 		Address:     addr,
 		Predecessor: nil,
-		Successor:   self,
+		Successors:  succList,
 		FingerTable: fingers,
+		m:           m,
+		r:           numSucc,
+		Data:        make(map[string][]byte),
 	}
 }
 
-func (n *Node) ID()  {
-	
-}
+
+

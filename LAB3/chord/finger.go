@@ -10,7 +10,7 @@ func (n *Node) initFingerTable() {
 	}
 
 	for i := 0; i < m; i++ {
-		start := computeFingerStart(n.id, i, m)
+		start := computeFingerStart(n.ID, i, m)
 		succ := n.Find(start)
 		if succ != nil {
 			n.mu.Lock()
