@@ -65,8 +65,11 @@ func main() {
 
 	// create node 
 	addr := *address + ":" + *port
-	nodeID := chord.HashKey(addr, 160) //sha1 hash of addr
-	node := chord.NewNode(nodeID,addr,160,*r) // Create node
+
+	hashLen := 20 // TODO:
+
+	nodeID := chord.HashKey(addr, hashLen) //sha1 hash of addr
+	node := chord.NewNode(nodeID,addr,hashLen,*r) // Create node
 	// start server 
 	go chord.StartRPCServer(node, *address, *port)
 
@@ -76,7 +79,7 @@ func main() {
 	} else {
 		bootstrap := &chord.RemoteNode{
 			Addr:	*ja + ":" + *jp,
-			ID:		chord.HashKey(*ja + ":" + *jp,160),
+			ID:		chord.HashKey(*ja + ":" + *jp,hashLen),
 		}
 		fmt.Printf("Joining ring via:%s \n",bootstrap.Addr)
 

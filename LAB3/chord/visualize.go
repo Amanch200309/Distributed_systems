@@ -19,12 +19,15 @@ func (n *Node) PrintState() string {
 
     // Successor List
     output.WriteString("==== Successor List ====\n")
-    if len(n.Successors) > 0 && n.Successors[0] != nil {
-        output.WriteString(fmt.Sprintf(
-            "Primary: ID=%s  Addr=%s\n",
-            n.Successors[0].ID.Text(16),
-            n.Successors[0].Addr,
-        ))
+    for i, succ := range n.Successors {
+        if succ != nil {
+            output.WriteString(fmt.Sprintf(
+                "[%02d] ID=%s  Addr=%s\n",
+                i,
+                succ.ID.Text(16),
+                succ.Addr,
+            ))
+        }
     }
 
     for i, succ := range n.Successors {
