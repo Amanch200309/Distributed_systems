@@ -1,11 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"flag"
+	"fmt"
 	"log"
 	"os"
-	"fmt"
-	"bufio"
 	"strings"
 
 	"github.com/Amanch200309/Distributed_systems/LAB3/chord"
@@ -63,38 +63,36 @@ func main() {
 		log.Fatal("--ja and --jp must both be specified together")
 	}
 
-	// create node 
+	// create node
 	addr := *address + ":" + *port
 
 	hashLen := 20 // TODO:
 
-	nodeID := chord.HashKey(addr, hashLen) //sha1 hash of addr
-	node := chord.NewNode(nodeID,addr,hashLen,*r) // Create node
-	// start server 
+	nodeID := chord.HashKey(addr, hashLen)           //sha1 hash of addr
+	node := chord.NewNode(nodeID, addr, hashLen, *r) // Create node
+	// start server
 	go chord.StartRPCServer(node, *address, *port)
 
 	if *ja == "" {
-		fmt.Printf("Creating new Chord ring at: %s \n",addr)
+		fmt.Printf("Creating new Chord ring at: %s \n", addr)
 		node.Create()
 	} else {
 		bootstrap := &chord.RemoteNode{
-			Addr:	*ja + ":" + *jp,
-			ID:		chord.HashKey(*ja + ":" + *jp,hashLen),
+			Addr: *ja + ":" + *jp,
+			ID:   chord.HashKey(*ja+":"+*jp, hashLen),
 		}
-		fmt.Printf("Joining ring via:%s \n",bootstrap.Addr)
+		fmt.Printf("Joining ring via:%s \n", bootstrap.Addr)
 
 		err := node.Join(bootstrap)
 		if err != nil {
-			log.Fatal("Join failed:",err)
-	}
+			log.Fatal("Join failed:", err)
+		}
 	}
 
-	go node.RunMaintenance(*ts,*tff,*tcp)
+	go node.RunMaintenance(*ts, *tff, *tcp)
 
 	fmt.Printf("Node is running. ID: %s, Address: %s\n", node.ID.Text(16), node.Address)
 	handleCommands(node)
-
-	
 
 }
 func isInRange(x int, low int, high int) bool {
@@ -118,53 +116,101 @@ where “node information” corresponds to the identifier, IP address, and port
 
 func handleCommands(n *chord.Node) {
 	sc := bufio.NewScanner(os.Stdin)
-	for {
 
+	printHelp() // Show available commands on start
+
+	for {
 		fmt.Print("> ")
-		
-		//ctrl + D to exit
+
 		if !sc.Scan() {
 			break
 		}
 
-		line := sc.Text() // read the whole line
-
-		parts := strings.Fields(line) // split by whitespace
-
-		if len(parts) == 0 {
-			continue // empty line eg enter
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
 		}
+
+		parts := strings.Fields(line)
 		cmd := strings.ToLower(parts[0])
 
-		switch cmd{
-			case "printstate":
-				fmt.Println(n.PrintState())
-			
-			case "lookup":
-				if len(parts) != 2 {
-					fmt.Println("Usage: Lookup <filename>")
-					continue
-				}
-				remote, _, err := n.Lookup(parts[1]) //lookup filename
-				if err != nil  {
-					fmt.Printf("Look up failed for Node: %s with error: %s \n",n.ID.Text(16), err)
-					continue
-				}
-				fmt.Printf("File owned by Node ID=%s, Addr=%s \n",remote.ID.Text(16),remote.Addr)
-			case "storefile":
-				if len(parts) != 2 {
-					fmt.Println("Usage: StoreFile <filepath>")
-					continue
-				}
-				err := n.StoreFile(parts[1]) // store file at filepath
-				if err != nil {
-					fmt.Printf("StoreFile error: %s \n",err)
-				} else {
-					fmt.Println("File stored successfully.")
-				}
-			default:
-				fmt.Printf("Unknown command: %s. Available commands: Lookup, StoreFile, PrintState",cmd)
-		}		
-	}
+		switch cmd {
 
+		// ----------------------------------------------------
+		// Standard assignment commands
+		// ----------------------------------------------------
+		case "printstate":
+			fmt.Println(n.PrintState())
+
+		case "lookup":
+			if len(parts) != 2 {
+				fmt.Println("Usage: lookup <filename>")
+				continue
+			}
+			remote, _, err := n.Lookup(parts[1])
+			if err != nil {
+				fmt.Printf("Lookup failed: %v\n", err)
+				continue
+			}
+			fmt.Printf("Owned by Node %s @ %s\n",
+				remote.ID.Text(16), remote.Addr)
+
+		case "storefile":
+			if len(parts) != 2 {
+				fmt.Println("Usage: storefile <filepath>")
+				continue
+			}
+			if err := n.StoreFile(parts[1]); err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				fmt.Println("File stored successfully.")
+			}
+
+		case "ring":
+			fmt.Println(n.PrintRingStatus())
+
+		case "files":
+			fmt.Println(n.PrintFileDistribution())
+
+		case "compact":
+			fmt.Println(n.PrintCompactRing())
+
+		case "verify":
+			fmt.Println(n.VerifyFileOwnership())
+
+		case "clear":
+			fmt.Print("\033[H\033[2J") // ANSI clear screen
+
+		case "help":
+			printHelp()
+
+		case "exit", "quit":
+			fmt.Println("Exiting.")
+			return
+
+		default:
+			fmt.Printf("Unknown command: %s\n", cmd)
+			printHelp()
+		}
+	}
+}
+
+func printHelp() {
+	fmt.Println("\nAvailable commands:")
+	fmt.Println("  lookup <filename>        - Find which node owns a file")
+	fmt.Println("  storefile <path>         - Store a file into the Chord ring")
+	fmt.Println("  printstate               - Print local node state")
+	fmt.Println()
+	fmt.Println("  ring                     - Full ring visualization")
+	fmt.Println("  files                    - File distribution table")
+	fmt.Println("  verify                   - Validate file ownership")
+	fmt.Println("  compact                  - One-line ring view")
+	fmt.Println("  debugfingers             - Show finger table details")
+	fmt.Println("  verifyfingers            - Validate finger table correctness")
+	fmt.Println("  testbetween a b c        - Test interval logic")
+	fmt.Println()
+	fmt.Println("  clear                    - Clear the terminal")
+	fmt.Println("  help                     - Show this help message")
+	fmt.Println("  exit / quit              - Exit the client")
+	fmt.Println()
 }

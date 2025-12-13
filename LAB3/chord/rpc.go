@@ -8,23 +8,19 @@ import (
 )
 
 func (n *Node) FindRPC(args *FindRequest, reply *FindReply) error {
-	// Use the node's full local Find() implementation
 	succ := n.Find(args.ID)
 	reply.Node = succ
 	return nil
 }
 
-// rpcs method
 func (n *Node) FindSuccessorRPC(args *FindSuccessorRequest, reply *FindSuccessorReply) error {
-
 	found, next := n.findSuccessor(args.ID)
-
 	reply.Found = found
 	reply.Node = next
-
 	return nil
 }
 
+// FIXED: Use pointer for both arguments
 func (n *Node) GetPredecessorRPC(arg *GetPredecessorRequest, reply *GetPredecessorReply) error {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -32,12 +28,14 @@ func (n *Node) GetPredecessorRPC(arg *GetPredecessorRequest, reply *GetPredecess
 	return nil
 }
 
+// FIXED: Use pointer for both arguments
 func (n *Node) NotifyRPC(arg *NotifyRequest, reply *NotifyReply) error {
 	n.notify(arg.Node)
 	return nil
 }
 
-func (rn *Node) PingRPC(arg *PingRequest, reply *PingReply) error {
+// FIXED: Use pointer for both arguments
+func (n *Node) PingRPC(arg *PingRequest, reply *PingReply) error {
 	reply.Alive = true
 	return nil
 }
@@ -47,6 +45,12 @@ func (n *Node) StoreFileRPC(req *StoreFileRequest, rep *StoreFileReply) error {
 
 	n.mu.Lock()
 	n.Data[key] = req.Data
+	// Store file metadata
+	n.Files[key] = &FileMetadata{
+		Filename: req.Filename,
+		Data:     req.Data,
+		Hash:     req.Hash,
+	}
 	n.mu.Unlock()
 
 	rep.OK = true
@@ -69,7 +73,6 @@ func (n *Node) GetFileRPC(req *GetFileRequest, rep *GetFileReply) error {
 	rep.Data = data
 	return nil
 }
-
 
 // RPC request and reply types
 
@@ -103,7 +106,7 @@ type FindSuccessorReply struct {
 }
 
 type GetPredecessorRequest struct {
-	//TODO:
+	// Empty struct for RPC
 }
 
 type GetPredecessorReply struct {
@@ -115,9 +118,13 @@ type NotifyRequest struct {
 }
 
 type NotifyReply struct {
+	// Empty struct for RPC
 }
+
 type PingRequest struct {
+	// Empty struct for RPC
 }
+
 type PingReply struct {
 	Alive bool
 }
@@ -128,6 +135,59 @@ type FindRequest struct {
 
 type FindReply struct {
 	Node *RemoteNode
+}
+
+// RPC for getting node information
+type NodeInfoRequest struct {
+	// Empty
+}
+
+type NodeInfoReply struct {
+	ID          *big.Int
+	Address     string
+	Successor   *RemoteNode
+	Predecessor *RemoteNode
+	Successors  []*RemoteNode
+	FingerCount int
+	Files       map[string]bool // Just filenames
+}
+
+func (n *Node) GetNodeInfoRPC(req *NodeInfoRequest, reply *NodeInfoReply) error {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	reply.ID = n.ID
+	reply.Address = n.Address
+	reply.Predecessor = n.Predecessor
+
+	// Filter out nil elements from Successors to avoid gob encoding errors
+	reply.Successors = make([]*RemoteNode, 0, len(n.Successors))
+	for _, s := range n.Successors {
+		if s != nil {
+			reply.Successors = append(reply.Successors, s)
+		}
+	}
+
+	if len(reply.Successors) > 0 {
+		reply.Successor = reply.Successors[0]
+	}
+
+	// Count non-nil fingers
+	count := 0
+	for _, f := range n.FingerTable {
+		if f != nil {
+			count++
+		}
+	}
+	reply.FingerCount = count
+
+	// Collect file names
+	reply.Files = make(map[string]bool)
+	for _, meta := range n.Files {
+		reply.Files[meta.Filename] = true
+	}
+
+	return nil
 }
 
 func call(address string, rpcname string, args interface{}, reply interface{}) bool {
@@ -159,10 +219,8 @@ func StartRPCServer(node *Node, address string, port string) error {
 			if err != nil {
 				log.Fatal("accept error:", err)
 			}
-			go server.ServeConn(conn) // handle connections concurrently from multiple clients
+			go server.ServeConn(conn)
 		}
 	}()
 	return nil
-
 }
-

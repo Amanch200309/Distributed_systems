@@ -10,20 +10,27 @@ type RemoteNode struct {
 	Addr string
 }
 
+// FileMetadata stores information about a file
+type FileMetadata struct {
+	Filename string
+	Data     []byte
+	Hash     *big.Int
+}
+
 // Node represents a node in the Chord DHT
 type Node struct {
 	ID *big.Int
 	mu sync.RWMutex
 
-	Address       string
-	Predecessor   *RemoteNode
-	Successors    []*RemoteNode   // successor list of size r
-	FingerTable   []*RemoteNode   // size m
-	m             int
-	r             int
-	Data 		  map[string][]byte    // files to store 
+	Address     string
+	Predecessor *RemoteNode
+	Successors  []*RemoteNode // successor list of size r
+	FingerTable []*RemoteNode // size m
+	m           int
+	r           int
+	Data        map[string][]byte        // hash -> data (for backward compatibility)
+	Files       map[string]*FileMetadata // hash -> metadata (NEW!)
 }
-
 
 func NewNode(id *big.Int, addr string, m int, numSucc int) *Node {
 	self := &RemoteNode{ID: id, Addr: addr}
@@ -44,8 +51,6 @@ func NewNode(id *big.Int, addr string, m int, numSucc int) *Node {
 		m:           m,
 		r:           numSucc,
 		Data:        make(map[string][]byte),
+		Files:       make(map[string]*FileMetadata),
 	}
 }
-
-
-
