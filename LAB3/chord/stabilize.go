@@ -116,12 +116,27 @@ func (n *Node) stabilize() {
 	var succListReply GetSuccessorListReply
 	if call(succAddr, "Node.GetSuccessorListRPC", &GetSuccessorListRequest{}, &succListReply) {
 		n.mu.Lock()
-		// Copy successor's list to fill our remaining slots
-		maxCopy := len(n.Successors) - 1
-		for i := 0; i < len(succListReply.Successors) && i < maxCopy; i++ {
-			if succListReply.Successors[i] != nil {
-				n.Successors[i+1] = succListReply.Successors[i]
+		// Copy successor's list to fill our remaining slots, avoiding duplicates and self
+		nextSlot := 1
+		seen := make(map[string]bool)
+		seen[n.Address] = true            // Don't add ourselves
+		seen[n.Successors[0].Addr] = true // Don't duplicate first successor
+
+		for i := 0; i < len(succListReply.Successors) && nextSlot < len(n.Successors); i++ {
+			node := succListReply.Successors[i]
+			if node != nil && !seen[node.Addr] {
+				// Verify node is alive before adding
+				var pingReply PingReply
+				if call(node.Addr, "Node.PingRPC", &PingRequest{}, &pingReply) {
+					n.Successors[nextSlot] = node
+					seen[node.Addr] = true
+					nextSlot++
+				}
 			}
+		}
+		// Clear remaining slots
+		for i := nextSlot; i < len(n.Successors); i++ {
+			n.Successors[i] = nil
 		}
 		n.mu.Unlock()
 	}
