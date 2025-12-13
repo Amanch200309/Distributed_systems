@@ -92,6 +92,20 @@ func (n *Node) stabilize() {
 	call(succAddr, "Node.NotifyRPC", &req, &reply_2) // notify successor om mig själv
 	//ex 21 -> 45 -> 10 då måste 10 notify 21 om 45
 
+	// Update successor list by copying from successor
+	// Successors[1..r-1] = successor's Successors[0..r-2]
+	var succListReply GetSuccessorListReply
+	if call(succAddr, "Node.GetSuccessorListRPC", &GetSuccessorListRequest{}, &succListReply) {
+		n.mu.Lock()
+		// Copy successor's list to fill our remaining slots
+		for i := 0; i < len(succListReply.Successors) && i+1 < n.r; i++ {
+			if succListReply.Successors[i] != nil {
+				n.Successors[i+1] = succListReply.Successors[i]
+			}
+		}
+		n.mu.Unlock()
+	}
+
 }
 
 /*

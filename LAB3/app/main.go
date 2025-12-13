@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"math/big"
 
 	"github.com/Amanch200309/Distributed_systems/LAB3/chord"
 )
@@ -38,7 +39,7 @@ var (
 	tcp = flag.Int("tcp", 0, "Time in milliseconds between invocations of 'check predecessor'") // tcp, time check predecessor
 
 	r = flag.Int("r", 0, "Number of successors maintained by the Chord client") // r, number of successors
-
+	i = flag.String("i", "", "The identifier (ID) assigned to the Chord client (40 hex chars)")
 )
 
 func main() {
@@ -63,14 +64,43 @@ func main() {
 		log.Fatal("--ja and --jp must both be specified together")
 	}
 
+<<<<<<< HEAD
 	// create node
+=======
+	// Validate -i flag format if provided
+	if *i != "" {
+		if len(*i) != 40 {
+			log.Fatal("-i must be exactly 40 characters")
+		}
+		for _, c := range *i {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+				log.Fatal("-i must contain only hex characters [0-9a-fA-F]")
+			}
+		}
+	}
+
+	// create node 
+>>>>>>> 8080ed7bfd3ce1c0cee1a751dd66a79ca070ce1e
 	addr := *address + ":" + *port
 
-	hashLen := 20 // TODO:
+	hashLen := 20 // 20 bytes = 160 bits for SHA-1
 
+<<<<<<< HEAD
 	nodeID := chord.HashKey(addr, hashLen)           //sha1 hash of addr
 	node := chord.NewNode(nodeID, addr, hashLen, *r) // Create node
 	// start server
+=======
+	var nodeID *big.Int
+	if *i != "" {
+		// Use custom ID if provided
+		nodeID = new(big.Int)
+		nodeID.SetString(*i, 16)
+	} else {
+		nodeID = chord.HashKey(addr, hashLen) //sha1 hash of addr
+	}
+	node := chord.NewNode(nodeID,addr,hashLen,*r) // Create node
+	// start server 
+>>>>>>> 8080ed7bfd3ce1c0cee1a751dd66a79ca070ce1e
 	go chord.StartRPCServer(node, *address, *port)
 
 	if *ja == "" {
@@ -134,7 +164,55 @@ func handleCommands(n *chord.Node) {
 		parts := strings.Fields(line)
 		cmd := strings.ToLower(parts[0])
 
+<<<<<<< HEAD
 		switch cmd {
+=======
+		switch cmd{
+			case "printstate":
+				fmt.Println(n.PrintState())
+			
+			case "lookup":
+				if len(parts) != 2 {
+					fmt.Println("Usage: Lookup <filename>")
+					continue
+				}
+				remote, data, err := n.Lookup(parts[1]) //lookup filename
+				if err != nil  {
+					fmt.Printf("Look up failed for Node: %s with error: %s \n",n.ID.Text(16), err)
+					continue
+				}
+				// Split address to show IP and port separately
+				addrParts := strings.Split(remote.Addr, ":")
+				ip := addrParts[0]
+				port := ""
+				if len(addrParts) > 1 {
+					port = addrParts[1]
+				}
+				fmt.Printf("File '%s' found:\n", parts[1])
+				fmt.Printf("  Node ID: %s\n", remote.ID.Text(16))
+				fmt.Printf("  IP Address: %s\n", ip)
+				fmt.Printf("  Port: %s\n", port)
+				if data != nil && len(data) > 0 {
+					fmt.Printf("  Contents:\n%s\n", string(data))
+				} else {
+					fmt.Println("  File not found or empty")
+				}
+			case "storefile":
+				if len(parts) != 2 {
+					fmt.Println("Usage: StoreFile <filepath>")
+					continue
+				}
+				err := n.StoreFile(parts[1]) // store file at filepath
+				if err != nil {
+					fmt.Printf("StoreFile error: %s \n",err)
+				} else {
+					fmt.Println("File stored successfully.")
+				}
+			default:
+				fmt.Printf("Unknown command: %s. Available commands: Lookup, StoreFile, PrintState",cmd)
+		}		
+	}
+>>>>>>> 8080ed7bfd3ce1c0cee1a751dd66a79ca070ce1e
 
 		// ----------------------------------------------------
 		// Standard assignment commands

@@ -29,15 +29,15 @@ func (n *Node) PrintState() string {
             ))
         }
     }
+    output.WriteString("\n")
 
-    for i, succ := range n.Successors {
-        if succ != nil {
-            output.WriteString(fmt.Sprintf(
-                "  [%02d] ID=%s  Addr=%s\n",
-                i,
-                succ.ID.Text(16),
-                succ.Addr,
-            ))
+    // Stored Files
+    output.WriteString("==== Stored Files ====\n")
+    if len(n.Data) == 0 {
+        output.WriteString("None\n")
+    } else {
+        for key := range n.Data {
+            output.WriteString(fmt.Sprintf("  Hash: %s\n", key))
         }
     }
     output.WriteString("\n")
