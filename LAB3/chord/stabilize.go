@@ -32,6 +32,9 @@ n.notify(n′)
 */
 // notify en node att jag kanske är din predecessor
 func (n *Node) notify(x *RemoteNode) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	
 	if n.Predecessor == nil || n.between(n.Predecessor.ID, x.ID, n.ID) {
 		n.Predecessor = x
 	}
@@ -98,7 +101,8 @@ func (n *Node) stabilize() {
 	if call(succAddr, "Node.GetSuccessorListRPC", &GetSuccessorListRequest{}, &succListReply) {
 		n.mu.Lock()
 		// Copy successor's list to fill our remaining slots
-		for i := 0; i < len(succListReply.Successors) && i+1 < n.r; i++ {
+		maxCopy := len(n.Successors) - 1
+		for i := 0; i < len(succListReply.Successors) && i < maxCopy; i++ {
 			if succListReply.Successors[i] != nil {
 				n.Successors[i+1] = succListReply.Successors[i]
 			}
@@ -129,6 +133,38 @@ func (n *Node) checkPredecessor() {
 		}
 	}
 
+}
+
+// checkSuccessor verifies first successor is alive, if not use backup from list
+func (n *Node) checkSuccessor() {
+	n.mu.RLock()
+	if n.Successors[0] == nil {
+		n.mu.RUnlock()
+		return
+	}
+	succ := n.Successors[0]
+	n.mu.RUnlock()
+
+	// Try to ping current successor
+	var reply PingReply
+	ok := call(succ.Addr, "Node.PingRPC", &PingRequest{}, &reply)
+	
+	if !ok || !reply.Alive {
+		// First successor failed, shift list to use backup
+		n.mu.Lock()
+		// Shift all successors left, removing failed one
+		for i := 0; i < len(n.Successors)-1; i++ {
+			n.Successors[i] = n.Successors[i+1]
+		}
+		n.Successors[len(n.Successors)-1] = nil
+		
+		// If all successors are nil, we're alone in ring
+		if n.Successors[0] == nil {
+			self := &RemoteNode{ID: n.ID, Addr: n.Address}
+			n.Successors[0] = self
+		}
+		n.mu.Unlock()
+	}
 }
 
 /*
@@ -192,9 +228,16 @@ func (n *Node) RunMaintenance(ts int, tff int, tcp int) {
 	}()
 
 	go func() {
-
 		for {
 			n.checkPredecessor()
+			time.Sleep(time.Duration(tcp) * time.Millisecond)
+		}
+	}()
+	
+	// Check successor health
+	go func() {
+		for {
+			n.checkSuccessor()
 			time.Sleep(time.Duration(tcp) * time.Millisecond)
 		}
 	}()
