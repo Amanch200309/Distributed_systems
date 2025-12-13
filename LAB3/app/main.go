@@ -28,20 +28,27 @@ Represented as a base-10 integer. Must be specified, with a value in the range o
 */
 
 var (
-	address = flag.String("a", "", "IP address to listen on") // a- for address, "" for default,
-	port    = flag.String("p", "", "Port to listen on")       // p- for port, "" for default
+	address = flag.String("a", "", "IP address to listen on")
+	port    = flag.String("p", "", "Port to listen on")
 
-	ja = flag.String("ja", "", "The IP addres of the machine runnnig Chord node. The Chord client will join this node's ring")                    // ja
-	jp = flag.String("jp", "", "The port that an existing Chord node is bound to and listening on. The Chord client will join this nodes ring. ") // jp
+	ja = flag.String("ja", "", "IP address of existing Chord node to join")
+	jp = flag.String("jp", "", "Port of existing Chord node to join")
 
-	ts  = flag.Int("ts", 0, "Time in milliseconds between invocations of 'stabilize'")          // ts, time stabilize
-	tff = flag.Int("tff", 0, "Time in milliseconds between invocations of 'fix fingers'")       // tff, time fix fingers
-	tcp = flag.Int("tcp", 0, "Time in milliseconds between invocations of 'check predecessor'") // tcp, time check predecessor
+	ts  = flag.Int("ts", 0, "Time in milliseconds between stabilize calls")
+	tff = flag.Int("tff", 0, "Time in milliseconds between fix fingers calls")
+	tcp = flag.Int("tcp", 0, "Time in milliseconds between check predecessor calls")
 
-	r = flag.Int("r", 0, "Number of successors maintained by the Chord client") // r, number of successors
-	i = flag.String("i", "", "The identifier (ID) assigned to the Chord client (40 hex chars)")
+	r = flag.Int("r", 0, "Number of successors to maintain")
+	i = flag.String("i", "", "Custom node ID (40 hex characters)")
 )
 
+/*
+main initializes and runs a Chord node.
+
+	Parses command-line flags, validates arguments, creates node,
+	starts RPC server, joins or creates ring, runs maintenance tasks,
+	and handles user commands
+*/
 func main() {
 	flag.Parse()
 
@@ -115,8 +122,17 @@ func main() {
 	handleCommands(node)
 
 }
+
+/*
+isInRange checks if a value is within a range.
+
+	Args: 	x (value to check),
+			low (minimum value inclusive),
+			high (maximum value inclusive)
+	Returns: bool (true if low <= x <= high)
+*/
 func isInRange(x int, low int, high int) bool {
-	return x >= low && x <= high // low <= x <= high
+	return x >= low && x <= high
 }
 
 /*
@@ -215,6 +231,11 @@ func handleCommands(n *chord.Node) {
 	}
 }
 
+/*
+printHelp displays available commands to the user.
+
+	Shows command syntax and descriptions for all supported operations
+*/
 func printHelp() {
 	fmt.Println("\nAvailable commands:")
 	fmt.Println("  lookup <filename>        - Find which node owns a file")
@@ -225,9 +246,6 @@ func printHelp() {
 	fmt.Println("  files                    - File distribution table")
 	fmt.Println("  verify                   - Validate file ownership")
 	fmt.Println("  compact                  - One-line ring view")
-	fmt.Println("  debugfingers             - Show finger table details")
-	fmt.Println("  verifyfingers            - Validate finger table correctness")
-	fmt.Println("  testbetween a b c        - Test interval logic")
 	fmt.Println()
 	fmt.Println("  clear                    - Clear the terminal")
 	fmt.Println("  help                     - Show this help message")

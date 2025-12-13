@@ -1,28 +1,31 @@
 package chord
 
 import (
-	"strings"
-	"os"
 	"errors"
+	"os"
+	"strings"
 )
 
+/*
+StoreFile uploads a file into the Chord ring.
 
-// StoreFile: called by THIS node to upload a file into the ring
+	Args: 	path (local file path to upload)
+	Returns: error if file read or RPC call fails
+	Reads file, hashes filename to find responsible node,
+	sends file via RPC to that node for storage
+*/
 func (n *Node) StoreFile(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	// Extract filename only
 	parts := strings.Split(path, "/")
-	filename := parts[len(parts)-1]
+	filename := parts[len(parts)-1] // Extract filename from path
 
-	// Compute key = hash(filename)
-	key := HashKey(filename, n.m)
+	key := HashKey(filename, n.m) // Compute key = hash(filename)
 
-	// Lookup responsible node
-	target := n.Find(key)
+	target := n.Find(key) // Lookup responsible node
 	if target == nil {
 		return errors.New("StoreFile: lookup failed")
 	}
@@ -42,7 +45,16 @@ func (n *Node) StoreFile(path string) error {
 	return nil
 }
 
-// Lookup: return node info + file contents
+/*
+Lookup finds the node responsible for a file and retrieves its contents.
+
+	Args: 	filename (name of file to lookup)
+	Returns: owner (node storing the file),
+			 data (file contents),
+			 err (error if lookup or retrieval fails)
+	Hashes filename to find key, performs lookup to find owner node,
+	retrieves file data via RPC
+*/
 func (n *Node) Lookup(filename string) (owner *RemoteNode, data []byte, err error) {
 	key := HashKey(filename, n.m)
 

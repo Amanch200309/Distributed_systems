@@ -7,6 +7,14 @@ import (
 	"net/rpc"
 )
 
+/*
+FindRPC handles RPC requests to find the successor of an ID.
+
+	Args: 	args (contains ID to find successor for),
+			reply (populated with successor node)
+	Returns: error (always nil in current implementation)
+	Performs complete lookup starting from this node
+*/
 func (n *Node) FindRPC(args *FindRequest, reply *FindReply) error {
 	succ := n.Find(args.ID)
 	if succ == nil {
@@ -20,6 +28,15 @@ func (n *Node) FindRPC(args *FindRequest, reply *FindReply) error {
 	return nil
 }
 
+/*
+FindSuccessorRPC handles one step of iterative lookup.
+
+	Args: 	args (contains ID to find successor for),
+			reply (populated with found status and next node)
+	Returns: error (always nil)
+	Returns true and successor if ID is between this node and successor,
+	otherwise returns false and closest preceding node to continue search
+*/
 func (n *Node) FindSuccessorRPC(args *FindSuccessorRequest, reply *FindSuccessorReply) error {
 	found, next := n.findSuccessor(args.ID)
 	reply.Found = found
@@ -35,7 +52,14 @@ func (n *Node) FindSuccessorRPC(args *FindSuccessorRequest, reply *FindSuccessor
 	return nil
 }
 
-// FIXED: Use pointer for both arguments
+/*
+GetPredecessorRPC returns this node's predecessor.
+
+	Args: 	arg (empty request struct),
+			reply (populated with predecessor node)
+	Returns: error (always nil)
+	Used during stabilization to verify ring consistency
+*/
 func (n *Node) GetPredecessorRPC(arg *GetPredecessorRequest, reply *GetPredecessorReply) error {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -43,18 +67,40 @@ func (n *Node) GetPredecessorRPC(arg *GetPredecessorRequest, reply *GetPredecess
 	return nil
 }
 
-// FIXED: Use pointer for both arguments
+/*
+NotifyRPC handles notification from potential predecessor.
+
+	Args: 	arg (contains notifying node),
+			reply (empty reply struct)
+	Returns: error (always nil)
+	Updates predecessor if notifying node is closer than current predecessor
+*/
 func (n *Node) NotifyRPC(arg *NotifyRequest, reply *NotifyReply) error {
 	n.notify(arg.Node)
 	return nil
 }
 
-// FIXED: Use pointer for both arguments
+/*
+PingRPC checks if this node is alive.
+
+	Args: 	arg (empty request struct),
+			reply (populated with alive status)
+	Returns: error (always nil)
+	Used to detect failed nodes during stabilization
+*/
 func (n *Node) PingRPC(arg *PingRequest, reply *PingReply) error {
 	reply.Alive = true
 	return nil
 }
 
+/*
+StoreFileRPC stores a file on this node.
+
+	Args: 	req (contains filename, hash, and file data),
+			rep (populated with success status)
+	Returns: error (always nil)
+	Stores file data and metadata in node's storage maps
+*/
 func (n *Node) StoreFileRPC(req *StoreFileRequest, rep *StoreFileReply) error {
 	key := req.Hash.String()
 
@@ -72,6 +118,14 @@ func (n *Node) StoreFileRPC(req *StoreFileRequest, rep *StoreFileReply) error {
 	return nil
 }
 
+/*
+GetFileRPC retrieves a file from this node.
+
+	Args: 	req (contains file hash),
+			rep (populated with file data if found)
+	Returns: error (always nil)
+	Searches node's storage for file with matching hash
+*/
 func (n *Node) GetFileRPC(req *GetFileRequest, rep *GetFileReply) error {
 	key := req.Hash.String()
 
@@ -89,22 +143,44 @@ func (n *Node) GetFileRPC(req *GetFileRequest, rep *GetFileReply) error {
 	return nil
 }
 
-// RPC request and reply types
+/*
+StoreFileRequest contains data for storing a file.
 
+	Filename: Original filename
+	Hash: Hash of filename (DHT key)
+	Data: File contents as bytes
+*/
 type StoreFileRequest struct {
 	Filename string
 	Hash     *big.Int
 	Data     []byte
 }
 
+/*
+StoreFileReply indicates success of file storage.
+
+	OK: True if file was stored successfully
+*/
 type StoreFileReply struct {
 	OK bool
 }
 
+/*
+GetFileRequest requests a file by hash.
+
+	Hash: File hash (DHT key)
+*/
 type GetFileRequest struct {
 	Hash *big.Int
 }
 
+/*
+GetFileReply returns requested file data.
+
+	Filename: Name of the file
+	Data: File contents as bytes
+	OK: True if file was found
+*/
 type GetFileReply struct {
 	Filename string
 	Data     []byte
@@ -164,9 +240,18 @@ type NodeInfoReply struct {
 	Predecessor *RemoteNode
 	Successors  []*RemoteNode
 	FingerCount int
-	Files       map[string]bool // Just filenames
+	Files       map[string]bool
 }
 
+/*
+GetNodeInfoRPC returns comprehensive information about this node.
+
+	Args: 	req (empty request struct),
+			reply (populated with node information)
+	Returns: error (always nil)
+	Provides node state including ID, address, successor, predecessor,
+	finger table size, and stored file names for monitoring
+*/
 func (n *Node) GetNodeInfoRPC(req *NodeInfoRequest, reply *NodeInfoReply) error {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -205,13 +290,29 @@ func (n *Node) GetNodeInfoRPC(req *NodeInfoRequest, reply *NodeInfoReply) error 
 	return nil
 }
 
+/*
+GetSuccessorListRequest requests node's successor list.
+*/
 type GetSuccessorListRequest struct {
 }
 
+/*
+GetSuccessorListReply returns successor list.
+
+	Successors: Array of successor nodes
+*/
 type GetSuccessorListReply struct {
 	Successors []*RemoteNode
 }
 
+/*
+GetSuccessorListRPC returns this node's successor list.
+
+	Args: 	args (empty request struct),
+			reply (populated with successor list)
+	Returns: error (always nil)
+	Filters out nil entries to avoid encoding errors
+*/
 func (n *Node) GetSuccessorListRPC(args *GetSuccessorListRequest, reply *GetSuccessorListReply) error {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -225,6 +326,16 @@ func (n *Node) GetSuccessorListRPC(args *GetSuccessorListRequest, reply *GetSucc
 	return nil
 }
 
+/*
+call performs a remote procedure call to another node.
+
+	Args: 	address (target node address),
+			rpcname (method to call),
+			args (request arguments),
+			reply (response struct to populate)
+	Returns: bool (true if call succeeded, false on error)
+	Establishes TCP connection, makes RPC call, and closes connection
+*/
 func call(address string, rpcname string, args interface{}, reply interface{}) bool {
 	c, err := rpc.Dial("tcp", address)
 	if err != nil {
@@ -236,6 +347,16 @@ func call(address string, rpcname string, args interface{}, reply interface{}) b
 	return err == nil
 }
 
+/*
+StartRPCServer starts the RPC server for a Chord node.
+
+	Args: 	node (Chord node to serve RPC requests for),
+			address (IP address to bind to),
+			port (port to listen on)
+	Returns: error if server fails to start
+	Registers node with RPC server and handles incoming connections
+	in separate goroutines
+*/
 func StartRPCServer(node *Node, address string, port string) error {
 	server := rpc.NewServer()
 	err := server.Register(node)

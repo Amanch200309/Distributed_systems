@@ -7,7 +7,89 @@ import (
 	"strings"
 )
 
-// GetNodeInfo returns comprehensive info about this node
+/*
+PrintState returns a formatted string of this node's local state.
+
+	Returns: string containing node ID, address, successor list,
+			 stored files, finger table, and predecessor information
+	Used for the PrintState command to display node information
+*/
+func (n *Node) PrintState() string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	var output strings.Builder
+
+	// Node Information
+	output.WriteString("==== Node Information ====\n")
+	output.WriteString(fmt.Sprintf("ID:      %s\n", n.ID.Text(16)))
+	output.WriteString(fmt.Sprintf("Address: %s\n\n", n.Address))
+
+	// Successor List
+	output.WriteString("==== Successor List ====\n")
+	for i, succ := range n.Successors {
+		if succ != nil {
+			output.WriteString(fmt.Sprintf(
+				"[%02d] ID=%s  Addr=%s\n",
+				i,
+				succ.ID.Text(16),
+				succ.Addr,
+			))
+		}
+	}
+	output.WriteString("\n")
+
+	// Stored Files
+	output.WriteString("==== Stored Files ====\n")
+	if len(n.Data) == 0 {
+		output.WriteString("None\n")
+	} else {
+		for key := range n.Data {
+			output.WriteString(fmt.Sprintf("  Hash: %s\n", key))
+		}
+	}
+	output.WriteString("\n")
+
+	// Finger Table
+	output.WriteString("==== Finger Table ====\n")
+	for i, finger := range n.FingerTable {
+		if finger != nil {
+			output.WriteString(fmt.Sprintf(
+				"  [%02d] ID=%s  Addr=%s\n",
+				i,
+				finger.ID.Text(16),
+				finger.Addr,
+			))
+		}
+	}
+	output.WriteString("\n")
+
+	// Predecessor
+	output.WriteString("==== Predecessor ====\n")
+	if n.Predecessor != nil {
+		output.WriteString(fmt.Sprintf(
+			"ID=%s  Addr=%s\n",
+			n.Predecessor.ID.Text(16),
+			n.Predecessor.Addr,
+		))
+	} else {
+		output.WriteString("None\n")
+	}
+
+	return output.String()
+}
+
+/*
+NodeInfo holds comprehensive information about a Chord node.
+
+	ID: Node identifier
+	Address: Network address (IP:port)
+	Successor: First successor node
+	Predecessor: Previous node in ring
+	FingerCount: Number of non-nil finger table entries
+	StoredFiles: List of filenames stored on this node
+	SuccessorIDs: IDs of all successors in successor list
+*/
 type NodeInfo struct {
 	ID           *big.Int
 	Address      string
@@ -15,10 +97,16 @@ type NodeInfo struct {
 	Predecessor  *RemoteNode
 	FingerCount  int
 	StoredFiles  []string
-	SuccessorIDs []string // For successor list
+	SuccessorIDs []string
 }
 
-// GetAllNodesInfo crawls the ring starting from this node
+/*
+GetAllNodesInfo crawls the entire Chord ring and collects node information.
+
+	Returns: array of NodeInfo for all reachable nodes in the ring
+	Traverses ring via successor pointers, collecting information
+	from each node using RPC calls
+*/
 func (n *Node) GetAllNodesInfo() []*NodeInfo {
 	visited := make(map[string]bool)
 	var nodes []*NodeInfo
@@ -80,7 +168,13 @@ func (n *Node) GetAllNodesInfo() []*NodeInfo {
 	return nodes
 }
 
-// PrintRingStatus shows a visual representation of the ring
+/*
+PrintRingStatus returns a formatted visualization of the Chord ring.
+
+	Returns: string with formatted ring structure showing all nodes,
+			 their successors, predecessors, and stored files
+	Provides comprehensive view of ring topology and file distribution
+*/
 func (n *Node) PrintRingStatus() string {
 	nodes := n.GetAllNodesInfo()
 	if len(nodes) == 0 {
@@ -174,7 +268,12 @@ func (n *Node) PrintRingStatus() string {
 	return sb.String()
 }
 
-// PrintFileDistribution shows which files are stored where
+/*
+PrintFileDistribution returns a table showing file locations across the ring.
+
+	Returns: string with formatted table mapping filenames to nodes
+	Shows which node stores each file in the ring
+*/
 func (n *Node) PrintFileDistribution() string {
 	nodes := n.GetAllNodesInfo()
 	if len(nodes) == 0 {
@@ -241,7 +340,12 @@ func (n *Node) PrintFileDistribution() string {
 	return sb.String()
 }
 
-// PrintCompactRing shows a one-line ring visualization
+/*
+PrintCompactRing returns a concise one-line ring visualization.
+
+	Returns: string showing node IDs and file counts in ring order
+	Provides quick overview of ring structure
+*/
 func (n *Node) PrintCompactRing() string {
 	nodes := n.GetAllNodesInfo()
 	if len(nodes) == 0 {
@@ -266,7 +370,13 @@ func (n *Node) PrintCompactRing() string {
 	return fmt.Sprintf("Ring: [%s] → (loops back)", strings.Join(parts, " → "))
 }
 
-// VerifyFileOwnership checks if files are stored on the correct nodes
+/*
+VerifyFileOwnership validates that files are stored on correct nodes.
+
+	Returns: string showing verification results for each file
+	Checks if each file's hash places it in the correct node's range
+	Used for debugging and testing ring consistency
+*/
 func (n *Node) VerifyFileOwnership() string {
 	nodes := n.GetAllNodesInfo()
 	if len(nodes) == 0 {
@@ -326,7 +436,15 @@ func (n *Node) VerifyFileOwnership() string {
 	return sb.String()
 }
 
-// Static helper for ownership checking
+/*
+betweenRightInclStatic checks if an ID is in interval (start, end].
+
+	Args: 	start (interval start, exclusive),
+			id (identifier to check),
+			end (interval end, inclusive)
+	Returns: bool (true if start < id <= end on the ring)
+	Helper function for ownership verification with right-inclusive interval
+*/
 func betweenRightInclStatic(start, id, end *big.Int) bool {
 	if id.Cmp(end) == 0 {
 		return true

@@ -5,7 +5,13 @@ import (
 	"time"
 )
 
-// update finger table entries.
+/*
+fixFinger updates a single finger table entry.
+
+	Args: 	i (finger table index to update)
+	Computes start of finger interval as (n + 2^i) mod 2^m,
+	finds successor of that start, and updates finger table entry
+*/
 func (n *Node) fixFinger(i int) {
 	n.mu.RLock()
 	m := len(n.FingerTable)
@@ -24,12 +30,13 @@ func (n *Node) fixFinger(i int) {
 	}
 }
 
-/* n′ thinks it might be our predecessor.
-n.notify(n′)
-	if (predecessor is nil or n′ ∈ (predecessor, n))
-	predecessor = n′;
+/*
+notify handles notification from a potential predecessor.
+
+	Args: 	x (node that thinks it might be our predecessor)
+	Updates predecessor if x is closer than current predecessor
+	Used during stabilization to maintain correct predecessor pointers
 */
-// notify en node att jag kanske är din predecessor
 func (n *Node) notify(x *RemoteNode) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -39,7 +46,15 @@ func (n *Node) notify(x *RemoteNode) {
 	}
 }
 
-// start = (n + 2ⁱ) mod 2ᵐ
+/*
+computeFingerStart calculates the start of a finger table interval.
+
+	Args: 	id (node identifier),
+			i (finger index),
+			m (number of bits in hash space)
+	Returns: big.Int representing (id + 2^i) mod 2^m
+	Used to determine which node should be the i-th finger
+*/
 func computeFingerStart(id *big.Int, i int, m int) *big.Int {
 	two := big.NewInt(2)                                     // 2
 	twoI := new(big.Int).Exp(two, big.NewInt(int64(i)), nil) // 2^i
@@ -51,9 +66,16 @@ func computeFingerStart(id *big.Int, i int, m int) *big.Int {
 	start.Mod(start, mod) // n+ 2^i mod 2^m
 
 	return start
-
 }
 
+/*
+stabilize verifies and updates this node's successor.
+
+	Asks successor for its predecessor, updates successor if predecessor
+	is closer, notifies successor of this node's existence
+	Updates successor list by copying from successor's list
+	Handles failed successor by using backup from successor list
+*/
 func (n *Node) stabilize() {
 	n.mu.RLock()
 	succ := n.Successors[0]
@@ -144,10 +166,10 @@ func (n *Node) stabilize() {
 }
 
 /*
-n.check predecessor()
+checkPredecessor verifies that predecessor is still alive.
 
-	if (predecessor has failed)
-	predecessor = nil;
+	Pings predecessor node, sets predecessor to nil if ping fails
+	Called periodically to detect failed predecessors
 */
 func (n *Node) checkPredecessor() {
 	n.mu.RLock()
@@ -215,10 +237,16 @@ n.check predecessor()
 	predecessor = nil;
 */
 
-// while looping maintenance tasks
-func (n *Node) RunMaintenance(ts int, tff int, tcp int) {
-	// kör stablize fixFingers jämna mellan rum
+/*
+RunMaintenance starts periodic maintenance tasks.
 
+	Args: 	ts (time between stabilize calls in milliseconds),
+			tff (time between fix fingers calls in milliseconds),
+			tcp (time between check predecessor calls in milliseconds)
+	Runs stabilize, checkPredecessor, and fixFinger in separate goroutines
+	Each task runs continuously at the specified interval
+*/
+func (n *Node) RunMaintenance(ts int, tff int, tcp int) {
 	go func() {
 		for {
 			n.stabilize()
