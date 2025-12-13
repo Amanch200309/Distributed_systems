@@ -37,12 +37,39 @@ func (n *Node) StoreFile(path string) error {
 	}
 	rep := &StoreFileReply{}
 
+	// Store on primary node
 	ok := call(target.Addr, "Node.StoreFileRPC", req, rep)
 	if !ok || !rep.OK {
 		return errors.New("StoreFile: RPC failed")
 	}
 
+	// Replicate to successor nodes for fault tolerance
+	// Get successor list from target node
+	succReq := &GetSuccessorListRequest{}
+	succRep := &GetSuccessorListReply{}
+	if call(target.Addr, "Node.GetSuccessorListRPC", succReq, succRep) {
+		// Replicate to r-1 successors (target already has it)
+		replicaCount := 0
+		maxReplicas := min(3, len(succRep.Successors)) // Replicate to up to 3 successors
+
+		for _, succ := range succRep.Successors {
+			if succ != nil && succ.Addr != target.Addr && replicaCount < maxReplicas {
+				replicaRep := &StoreFileReply{}
+				call(succ.Addr, "Node.StoreFileRPC", req, replicaRep)
+				// Don't fail if replica storage fails - we have primary
+				replicaCount++
+			}
+		}
+	}
+
 	return nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 /*
