@@ -3,7 +3,6 @@ package chord
 import (
 	"math/big"
 	"time"
-	
 )
 
 // update finger table entries.
@@ -34,7 +33,7 @@ n.notify(n′)
 func (n *Node) notify(x *RemoteNode) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	
+
 	if n.Predecessor == nil || n.between(n.Predecessor.ID, x.ID, n.ID) {
 		n.Predecessor = x
 	}
@@ -70,9 +69,26 @@ func (n *Node) stabilize() {
 	//   x = successor.predecessor; fråga sucessor om sin predecessor
 	var reply GetPredecessorReply
 	ok := call(succ.Addr, "Node.GetPredecessorRPC", &GetPredecessorRequest{}, &reply)
-	
 
-	if ok && reply.Node != nil {
+	// If successor is dead, use backup from successor list
+	if !ok {
+		n.mu.Lock()
+		// Shift successors left, removing failed one
+		for i := 0; i < len(n.Successors)-1; i++ {
+			n.Successors[i] = n.Successors[i+1]
+		}
+		n.Successors[len(n.Successors)-1] = nil
+
+		// If all successors failed, we're alone
+		if n.Successors[0] == nil {
+			self := &RemoteNode{ID: n.ID, Addr: n.Address}
+			n.Successors[0] = self
+		}
+		n.mu.Unlock()
+		return
+	}
+
+	if reply.Node != nil {
 		x := reply.Node
 
 		if n.between(id, x.ID, succ.ID) { //  id < x < succ  se figure 7 i papperet
@@ -133,38 +149,6 @@ func (n *Node) checkPredecessor() {
 		}
 	}
 
-}
-
-// checkSuccessor verifies first successor is alive, if not use backup from list
-func (n *Node) checkSuccessor() {
-	n.mu.RLock()
-	if n.Successors[0] == nil {
-		n.mu.RUnlock()
-		return
-	}
-	succ := n.Successors[0]
-	n.mu.RUnlock()
-
-	// Try to ping current successor
-	var reply PingReply
-	ok := call(succ.Addr, "Node.PingRPC", &PingRequest{}, &reply)
-	
-	if !ok || !reply.Alive {
-		// First successor failed, shift list to use backup
-		n.mu.Lock()
-		// Shift all successors left, removing failed one
-		for i := 0; i < len(n.Successors)-1; i++ {
-			n.Successors[i] = n.Successors[i+1]
-		}
-		n.Successors[len(n.Successors)-1] = nil
-		
-		// If all successors are nil, we're alone in ring
-		if n.Successors[0] == nil {
-			self := &RemoteNode{ID: n.ID, Addr: n.Address}
-			n.Successors[0] = self
-		}
-		n.mu.Unlock()
-	}
 }
 
 /*
@@ -233,14 +217,7 @@ func (n *Node) RunMaintenance(ts int, tff int, tcp int) {
 			time.Sleep(time.Duration(tcp) * time.Millisecond)
 		}
 	}()
-	
-	// Check successor health
-	go func() {
-		for {
-			n.checkSuccessor()
-			time.Sleep(time.Duration(tcp) * time.Millisecond)
-		}
-	}()
+
 	go func() {
 		nextFix := 0
 
