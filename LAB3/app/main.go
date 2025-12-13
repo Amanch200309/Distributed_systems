@@ -153,7 +153,7 @@ where “node information” corresponds to the identifier, IP address, and port
 func handleCommands(n *chord.Node) {
 	sc := bufio.NewScanner(os.Stdin)
 
-	printHelp() // Show available commands on start
+	fmt.Println("Type 'help' to see available commands.")
 
 	for {
 		fmt.Print("> ")
@@ -171,10 +171,6 @@ func handleCommands(n *chord.Node) {
 		cmd := strings.ToLower(parts[0])
 
 		switch cmd {
-
-		// ----------------------------------------------------
-		// Standard assignment commands
-		// ----------------------------------------------------
 		case "printstate":
 			fmt.Println(n.PrintState())
 
@@ -215,7 +211,7 @@ func handleCommands(n *chord.Node) {
 			fmt.Println(n.VerifyFileOwnership())
 
 		case "clear":
-			fmt.Print("\033[H\033[2J") // ANSI clear screen
+			fmt.Print("\033[H\033[2J")
 
 		case "help":
 			printHelp()
@@ -226,7 +222,6 @@ func handleCommands(n *chord.Node) {
 
 		default:
 			fmt.Printf("Unknown command: %s\n", cmd)
-			printHelp()
 		}
 	}
 }
