@@ -74,6 +74,8 @@ Find performs iterative Chord lookup starting from this node.
 	on the closest preceding node until successor is found
 	Used for local lookups (Lookup, StoreFile) when node is in the ring
 */
+
+// Find finds the successor of a given ID using iterative lookup.
 func (n *Node) Find(id *big.Int) *RemoteNode {
 	current := &RemoteNode{ID: n.ID, Addr: n.Address}
 

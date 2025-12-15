@@ -21,7 +21,7 @@ func (n *Node) fixFinger(i int) {
 		return
 	}
 
-	start := computeFingerStart(n.ID, i, m)
+	start := computeFingerStart(n.ID, i, m) // n + 2^i mod 2^m
 	succ := n.Find(start)
 	if succ != nil {
 		n.mu.Lock()
@@ -88,11 +88,21 @@ func (n *Node) stabilize() {
 		return
 	}
 
-	//   x = successor.predecessor; fråga sucessor om sin predecessor
+	// upptäcker om det finns en ny nod mellan mig och min successor
+	//   x = successor.predecessor; fråga sucessor om sin predecessor, pred= node before succ
 	var reply GetPredecessorReply
 	ok := call(succ.Addr, "Node.GetPredecessorRPC", &GetPredecessorRequest{}, &reply)
 
 	// If successor is dead, use backup from successor list
+	/*
+			Ring: 10 → 20 → 30 → 40
+		Node 10's successors: [20, 30, 40]
+
+		Node 20 dör:
+		→ Shift: [30, 40, nil]
+		→ Node 10's nya successor = 30
+		→ Nästa stabilize fyller på fler backups
+	*/
 	if !ok {
 		n.mu.Lock()
 		// Shift successors left, removing failed one
@@ -113,6 +123,9 @@ func (n *Node) stabilize() {
 	if reply.Node != nil {
 		x := reply.Node
 
+		// svaret från succ, svarar med sin predecessor
+		// kolla om predecessor ligger mellan mig och min successor
+		// ifall den gör det, uppdatera min successor till att vara predecessorn
 		if n.between(id, x.ID, succ.ID) { //  id < x < succ  se figure 7 i papperet
 			n.mu.Lock()
 			succ = x
@@ -132,14 +145,18 @@ func (n *Node) stabilize() {
 
 	call(succAddr, "Node.NotifyRPC", &req, &reply_2) // notify successor om mig själv
 	//ex 21 -> 45 -> 10 då måste 10 notify 21 om 45
+	// kollar om noden i fråga är predecessor till successor
 
 	// Update successor list by copying from successor
 	// Successors[1..r-1] = successor's Successors[0..r-2]
 	var succListReply GetSuccessorListReply
+
+	//fråga successor om dess successor lista bestående av r-1 noder pga r input
 	if call(succAddr, "Node.GetSuccessorListRPC", &GetSuccessorListRequest{}, &succListReply) {
+
 		n.mu.Lock()
 		// Copy successor's list to fill our remaining slots, avoiding duplicates and self
-		nextSlot := 1
+		nextSlot := 1 //vi börjar från 1 eftersom 0 är vår nuvarande successor
 		seen := make(map[string]bool)
 		seen[n.Address] = true            // Don't add ourselves
 		seen[n.Successors[0].Addr] = true // Don't duplicate first successor

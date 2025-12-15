@@ -5,13 +5,13 @@ import time
 import os
 import sys
 
-NUM_NODES = 8
+NUM_NODES = 6
 BASE_PORT = 8000
 BASE_IP = "127.0.0.1"
 TS = 1000
 TFF = 500
 TCP = 1000
-R = 3
+R = 4
 
 def cleanup_old_processes():
     print("Cleaning up old processes...")

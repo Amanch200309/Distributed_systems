@@ -55,8 +55,8 @@ type Node struct {
 	FingerTable []*RemoteNode // size m
 	m           int
 	r           int
-	Data        map[string][]byte // hash -> data (for backward compatibility)
-	Files       map[string]*FileMetadata
+	Data        map[string][]byte        // hash -> data (for backward compatibility) example "key":"value"
+	Files       map[string]*FileMetadata //example "hash": FileMetadata
 }
 
 /*
@@ -87,8 +87,8 @@ func NewNode(id *big.Int, addr string, m int, numSucc int) *Node {
 		FingerTable: fingers,
 		m:           m,
 		r:           numSucc,
-		Data:        make(map[string][]byte),
-		Files:       make(map[string]*FileMetadata),
+		Data:        make(map[string][]byte),        // hash -> data
+		Files:       make(map[string]*FileMetadata), // hash -> FileMetadata
 	}
 }
 
@@ -110,7 +110,7 @@ func (n *Node) Join(bootstrap *RemoteNode) error {
 
 	// Try contacting bootstrap multiple times
 	for i := 0; i < 5; i++ {
-		ok := call(bootstrap.Addr, "Node.FindRPC", args, &reply)
+		ok := call(bootstrap.Addr, "Node.FindRPC", args, &reply) // RPC call to find successor
 
 		if ok && reply.Node != nil {
 			// We found our successor
@@ -141,8 +141,8 @@ func (n *Node) Create() {
 	n.Predecessor = nil
 	n.Successors[0] = &RemoteNode{ID: n.ID, Addr: n.Address}
 
-	self := &RemoteNode{ID: n.ID, Addr: n.Address}
-	n.Successors[0] = self
+	self := &RemoteNode{ID: n.ID, Addr: n.Address} // Reference to self
+	n.Successors[0] = self                         // Set successor to self
 
 	// Initialize all finger table entries to self
 	for i := range n.FingerTable {
